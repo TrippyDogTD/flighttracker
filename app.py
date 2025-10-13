@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from FlightRadarAPI import FlightRadar24API
+from FlightRadar24 import FlightRadar24API
 from shapely.geometry import Point, Polygon
 import base64, json, os
 
