@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, HTMLResponse
 from FlightRadar24 import FlightRadar24API
 from shapely.geometry import Point, Polygon
@@ -8,7 +7,7 @@ import base64
 app = FastAPI()
 fr = FlightRadar24API()
 
-# ---- cyan area (Bogotá default) ----
+# Default cyan area (Bogotá)
 area_coords = {
     "tl_y": 4.7680835179814824,
     "tl_x": -74.1458266495095,
@@ -16,13 +15,12 @@ area_coords = {
     "br_x": -74.02347176023953
 }
 
-# cache and memory for last flight
 logo_cache = {}
 last_flight = None
 
 
 def flight_in_area(flight):
-    """Return True if flight position is inside cyan polygon."""
+    """Return True if flight position is inside the selected polygon."""
     lat = getattr(flight, "latitude", None)
     lon = getattr(flight, "longitude", None)
     if lat is None or lon is None:
@@ -43,7 +41,6 @@ def get_logo(iata, icao):
         return ""
     if key in logo_cache:
         return logo_cache[key]
-
     try:
         logo_bytes = fr.get_airline_logo(iata, icao)
         if logo_bytes:
@@ -64,7 +61,7 @@ async def root():
 
 @app.get("/map")
 async def map_page():
-    """Serve map editor page."""
+    """Map editing page."""
     return HTMLResponse("""
     <!DOCTYPE html>
     <html>
@@ -74,6 +71,7 @@ async def map_page():
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
         <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+        <script src="https://cdn.jsdelivr.net/npm/leaflet-easybutton@2/src/easy-button.js"></script>
         <style>html,body,#map{height:100%;margin:0}</style>
     </head>
     <body>
@@ -107,7 +105,6 @@ async def map_page():
 
         L.easyButton('💾', saveArea).addTo(map);
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/leaflet-easybutton@2/src/easy-button.js"></script>
     </body>
     </html>
     """)
@@ -133,16 +130,19 @@ async def save_area(data: dict):
 
 @app.get("/flight/current")
 async def get_current_flight():
-    """Return nearest or last flight inside area above 400ft."""
+    """Return the nearest outbound flight crossing the area."""
     global last_flight
 
     bounds = f"{area_coords['tl_y']},{area_coords['tl_x']},{area_coords['br_y']},{area_coords['br_x']}"
     flights = fr.get_flights(bounds=bounds)
 
-    filtered = [
-        f for f in flights
-        if getattr(f, "altitude", 0) > 400 and flight_in_area(f)
-    ]
+    filtered = []
+    for f in flights:
+        altitude = getattr(f, "altitude", 0)
+        vspeed = getattr(f, "vertical_speed", 0)
+        dest = getattr(f, "destination_airport_iata", "")
+        if altitude > 400 and vspeed > 0 and dest != "BOG" and flight_in_area(f):
+            filtered.append(f)
 
     if not filtered:
         if last_flight:
