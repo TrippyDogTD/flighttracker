@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, HTMLResponse
 from FlightRadar24 import FlightRadar24API
 from shapely.geometry import Point, Polygon
-import base64, time
+import base64, time, datetime
 
 app = FastAPI()
 fr = FlightRadar24API()
@@ -122,7 +122,7 @@ async def save_area(data: dict):
 
 @app.get("/flight/current")
 async def get_current_flight():
-    """Return northbound outbound flight, else idle message."""
+    """Return northbound outbound flight, else idle message with UTC time."""
     global last_flight, last_seen_time
 
     bounds = f"{area_coords['tl_y']},{area_coords['tl_x']},{area_coords['br_y']},{area_coords['br_x']}"
@@ -156,22 +156,23 @@ async def get_current_flight():
         last_seen_time = time.time()
         return JSONResponse(last_flight)
 
-    # If no current flight and last seen > 30s ago → idle
+    # Idle message if no new flight for >30s
     if time.time() - last_seen_time > 30:
+        utc_now = datetime.datetime.utcnow().strftime("%H:%MZ")
         return JSONResponse({
-            "flight": "NO TRAFFIC NORTHBOUND",
+            "flight": f"NO TRAFFIC NORTHBOUND — {utc_now}",
             "to": "",
             "aircraft": "",
             "altitude": "",
             "logo": ""
         })
 
-    # Else, keep last valid flight
     if last_flight:
         return JSONResponse(last_flight)
 
+    utc_now = datetime.datetime.utcnow().strftime("%H:%MZ")
     return JSONResponse({
-        "flight": "NO TRAFFIC NORTHBOUND",
+        "flight": f"NO TRAFFIC NORTHBOUND — {utc_now}",
         "to": "",
         "aircraft": "",
         "altitude": "",

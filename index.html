@@ -47,6 +47,13 @@ body {
     transform: rotateX(90deg);
     opacity: 0.3;
 }
+.idle {
+    animation: blink 2s infinite ease-in-out;
+}
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
 #edit {
     position: absolute;
     top: 20px;
@@ -83,6 +90,12 @@ async function updateBoard() {
     try {
         const res = await fetch('/flight/current');
         const data = await res.json();
+
+        const flightEl = document.getElementById('flight');
+        const isIdle = data.flight.startsWith("NO TRAFFIC");
+
+        if (isIdle) flightEl.classList.add('idle');
+        else flightEl.classList.remove('idle');
 
         for (const key of ['flight','to','aircraft','altitude']) {
             const el = document.getElementById(key);
