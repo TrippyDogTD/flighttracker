@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, HTMLResponse
 from FlightRadar24 import FlightRadar24API
 from shapely.geometry import Point, Polygon
-import base64
+import base64, time
 
 app = FastAPI()
 fr = FlightRadar24API()
@@ -17,10 +17,10 @@ area_coords = {
 
 logo_cache = {}
 last_flight = None
+last_seen_time = 0
 
 
 def flight_in_area(flight):
-    """Return True if flight position is inside the selected polygon."""
     lat = getattr(flight, "latitude", None)
     lon = getattr(flight, "longitude", None)
     if lat is None or lon is None:
@@ -35,7 +35,6 @@ def flight_in_area(flight):
 
 
 def get_logo(iata, icao):
-    """Return airline logo in base64 data URI."""
     key = (iata, icao)
     if not iata or not icao:
         return ""
@@ -54,14 +53,12 @@ def get_logo(iata, icao):
 
 @app.get("/")
 async def root():
-    """Serve main dashboard page."""
     with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 
 @app.get("/map")
 async def map_page():
-    """Map editing page."""
     return HTMLResponse("""
     <!DOCTYPE html>
     <html>
@@ -79,20 +76,17 @@ async def map_page():
         <script>
         const map = L.map('map').setView([4.7, -74.1], 11);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
         let drawnLayer = null;
         const drawControl = new L.Control.Draw({
             draw: { polygon: true, rectangle: false, circle: false, marker: false, circlemarker: false, polyline: false },
             edit: { featureGroup: new L.FeatureGroup() }
         });
         map.addControl(drawControl);
-
         map.on(L.Draw.Event.CREATED, e => {
             if (drawnLayer) map.removeLayer(drawnLayer);
             drawnLayer = e.layer;
             map.addLayer(drawnLayer);
         });
-
         function saveArea() {
             if (!drawnLayer) { alert("Draw area first"); return; }
             const coords = drawnLayer.getLatLngs()[0].map(p => [p.lat, p.lng]);
@@ -102,7 +96,6 @@ async def map_page():
                 body: JSON.stringify({ points: coords })
             }).then(() => alert("Area saved!"));
         }
-
         L.easyButton('💾', saveArea).addTo(map);
         </script>
     </body>
@@ -112,7 +105,6 @@ async def map_page():
 
 @app.post("/save-area")
 async def save_area(data: dict):
-    """Update cyan area coordinates."""
     global area_coords
     points = data.get("points", [])
     if not points:
@@ -130,33 +122,58 @@ async def save_area(data: dict):
 
 @app.get("/flight/current")
 async def get_current_flight():
-    """Return the nearest outbound flight crossing the area."""
-    global last_flight
+    """Return northbound outbound flight, else idle message."""
+    global last_flight, last_seen_time
 
     bounds = f"{area_coords['tl_y']},{area_coords['tl_x']},{area_coords['br_y']},{area_coords['br_x']}"
     flights = fr.get_flights(bounds=bounds)
 
     filtered = []
     for f in flights:
-        altitude = getattr(f, "altitude", 0)
+        alt = getattr(f, "altitude", 0)
         vspeed = getattr(f, "vertical_speed", 0)
+        heading = getattr(f, "heading", 0)
         dest = getattr(f, "destination_airport_iata", "")
-        if altitude > 400 and vspeed > 0 and dest != "BOG" and flight_in_area(f):
+        if (
+            alt > 400 and
+            vspeed > 0 and
+            dest != "BOG" and
+            (heading >= 320 or heading <= 60) and
+            flight_in_area(f)
+        ):
             filtered.append(f)
 
-    if not filtered:
-        if last_flight:
-            return JSONResponse(last_flight)
-        return JSONResponse({"flight": "No flight", "to": "", "aircraft": "", "altitude": "", "logo": ""})
+    if filtered:
+        closest = filtered[0]
+        logo_data = get_logo(getattr(closest, "airline_iata", ""), getattr(closest, "airline_icao", ""))
+        last_flight = {
+            "flight": getattr(closest, "callsign", "N/A"),
+            "to": getattr(closest, "destination_airport_iata", "N/A"),
+            "aircraft": getattr(closest, "aircraft_code", "N/A"),
+            "altitude": getattr(closest, "altitude", 0),
+            "logo": logo_data
+        }
+        last_seen_time = time.time()
+        return JSONResponse(last_flight)
 
-    closest = filtered[0]
-    logo_data = get_logo(getattr(closest, "airline_iata", ""), getattr(closest, "airline_icao", ""))
+    # If no current flight and last seen > 30s ago → idle
+    if time.time() - last_seen_time > 30:
+        return JSONResponse({
+            "flight": "NO TRAFFIC NORTHBOUND",
+            "to": "",
+            "aircraft": "",
+            "altitude": "",
+            "logo": ""
+        })
 
-    last_flight = {
-        "flight": getattr(closest, "callsign", "N/A"),
-        "to": getattr(closest, "destination_airport_iata", "N/A"),
-        "aircraft": getattr(closest, "aircraft_code", "N/A"),
-        "altitude": getattr(closest, "altitude", 0),
-        "logo": logo_data
-    }
-    return JSONResponse(last_flight)
+    # Else, keep last valid flight
+    if last_flight:
+        return JSONResponse(last_flight)
+
+    return JSONResponse({
+        "flight": "NO TRAFFIC NORTHBOUND",
+        "to": "",
+        "aircraft": "",
+        "altitude": "",
+        "logo": ""
+    })
