@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Flight Board</title>
+<style>
+body {
+    background-color: #000;
+    color: #0ff;
+    font-family: "Courier New", monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+}
+#board {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #001a1a;
+    border: 2px solid #00cccc;
+    padding: 1.5rem 2rem;
+    border-radius: 10px;
+    box-shadow: 0 0 30px rgba(0,255,255,0.3);
+}
+#logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    border-radius: 6px;
+    background-color: #002020;
+}
+.info {
+    display: flex;
+    flex-direction: column;
+    text-transform: uppercase;
+}
+.info span {
+    margin: 4px 0;
+    font-size: 1.2rem;
+}
+</style>
+</head>
+<body>
+    <div id="board">
+        <img id="logo" src="" alt="Airline Logo" />
+        <div class="info">
+            <span id="flight">Flight:</span>
+            <span id="to">Destination:</span>
+            <span id="aircraft">Aircraft:</span>
+            <span id="altitude">Altitude:</span>
+        </div>
+    </div>
+
+<script>
+async function updateBoard() {
+    try {
+        const res = await fetch('/flight/current');
+        const data = await res.json();
+
+        document.getElementById('flight').textContent = `Flight: ${data.flight}`;
+        document.getElementById('to').textContent = `Destination: ${data.to}`;
+        document.getElementById('aircraft').textContent = `Aircraft: ${data.aircraft}`;
+        document.getElementById('altitude').textContent = `Altitude: ${data.altitude} ft`;
+        if (data.logo) document.getElementById('logo').src = data.logo;
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+setInterval(updateBoard, 500); // update twice per second
+updateBoard();
+</script>
+</body>
+</html>
