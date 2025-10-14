@@ -25,7 +25,7 @@ async def home():
     return """
     <html>
     <head>
-        <title>Live Flight Board</title>
+        <title>Live Flight Board ✈✈</title>
         <link rel="stylesheet" href="/static/styles.css">
     </head>
     <body>
@@ -56,7 +56,7 @@ async def home():
         </div>
 
         <script>
-            // Flight flip animation
+            // Animate flip text
             function flipText(el, newText) {
                 if (el.innerText === newText) return;
                 el.classList.remove('flip-anim');
@@ -69,8 +69,7 @@ async def home():
                 try {
                     const res = await fetch('/flight');
                     const data = await res.json();
-                    const flightEl = document.getElementById('flight');
-                    flipText(flightEl, data.flight || '--');
+                    flipText(document.getElementById('flight'), data.flight || '--');
                     flipText(document.getElementById('destination'), data.destination || '--');
                     flipText(document.getElementById('aircraft'), data.aircraft || '--');
                     flipText(document.getElementById('altitude'), data.altitude || '--');
@@ -80,37 +79,32 @@ async def home():
                 }
             }
 
-            // Clock setup (split-flap digits)
-            function createClockDigits() {
+            // Split-flap clock (single instance)
+            function initClock() {
                 const container = document.getElementById("utc-clock");
-                if (!container.dataset.initialized) {
-                    container.dataset.initialized = "true";
-                    const digits = "00:00:00".split("");
-                    digits.forEach(c => {
-                        const el = document.createElement("div");
-                        if (c === ":") {
-                            el.textContent = ":";
-                            el.style.width = "12px";
-                            el.style.background = "none";
-                            el.style.fontSize = "2.2em";
-                            el.style.color = "#ffcc00";
-                        } else {
-                            el.classList.add("digit");
-                            el.dataset.value = c;
-                            el.textContent = c;
-                        }
-                        container.appendChild(el);
-                    });
+                if (container.dataset.ready) return;
+                container.dataset.ready = "true";
+                const template = "00:00:00".split("");
+                for (const ch of template) {
+                    const el = document.createElement("div");
+                    if (ch === ":") {
+                        el.textContent = ":";
+                        el.classList.add("colon");
+                    } else {
+                        el.classList.add("digit");
+                        el.dataset.value = ch;
+                        el.textContent = ch;
+                    }
+                    container.appendChild(el);
                 }
             }
 
             function updateClock() {
                 const now = new Date();
-                const utc = now.toISOString().slice(11, 19);
-                const chars = utc.split("");
+                const utcTime = now.toISOString().slice(11, 19).split("");
                 const digits = document.querySelectorAll("#utc-clock .digit");
                 digits.forEach((d, i) => {
-                    const newVal = chars[i];
+                    const newVal = utcTime[i];
                     if (!newVal || newVal === ":") return;
                     if (d.dataset.value !== newVal) {
                         d.classList.add("flip");
@@ -121,9 +115,9 @@ async def home():
                 });
             }
 
-            createClockDigits();
-            setInterval(updateClock, 1000);
+            initClock();
             updateClock();
+            setInterval(updateClock, 1000);
             updateFlight();
             setInterval(updateFlight, 7000);
         </script>
