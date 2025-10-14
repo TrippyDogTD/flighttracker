@@ -13,9 +13,7 @@ fr = FlightRadar24API()
 AREA_FILE = "area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
-# -----------------------------------------------------
-# Utility
-# -----------------------------------------------------
+
 def load_area():
     if os.path.exists(AREA_FILE):
         with open(AREA_FILE, "r") as f:
@@ -23,9 +21,6 @@ def load_area():
     return None
 
 
-# -----------------------------------------------------
-# Home page
-# -----------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def home():
     return """
@@ -35,27 +30,28 @@ async def home():
         <link rel="stylesheet" href="/static/styles.css">
     </head>
     <body>
-        <h1>✈ LIVE FLIGHT BOARD</h1>
+        <div class="flipboard">
+            <div class="header">✈ LIVE FLIGHT BOARD ✈</div>
+            <div class="flight-panel">
+                <div class="logo-frame">
+                    <img id="logo" src="/static/logos/default.png" alt="Logo">
+                </div>
 
-        <div class="board">
-            <div class="logo-frame">
-                <img id="logo" src="/static/logos/default.png" alt="Logo">
+                <div class="info">
+                    <div class="flip-row"><span class="label">Flight:</span><span id="flight" class="flip">--</span></div>
+                    <div class="flip-row"><span class="label">Destination:</span><span id="destination" class="flip">--</span></div>
+                    <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft" class="flip">--</span></div>
+                    <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">0 ft</span></div>
+                </div>
             </div>
-            <div class="info">
-                <div class="flip-row"><span class="label">Flight:</span><span id="flight" class="flip">--</span></div>
-                <div class="flip-row"><span class="label">Destination:</span><span id="destination" class="flip">--</span></div>
-                <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft" class="flip">--</span></div>
-                <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">0 ft</span></div>
-            </div>
+            <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
         </div>
-
-        <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
 
         <script>
             function flipText(el, newText) {
                 if (el.innerText === newText) return;
                 el.classList.remove('flip-anim');
-                void el.offsetWidth; // restart animation
+                void el.offsetWidth;
                 el.classList.add('flip-anim');
                 setTimeout(() => { el.innerText = newText; }, 250);
             }
@@ -73,17 +69,15 @@ async def home():
                     console.warn('Update failed');
                 }
             }
+
             updateFlight();
-            setInterval(updateFlight, 8000);
+            setInterval(updateFlight, 6000);
         </script>
     </body>
     </html>
     """
 
 
-# -----------------------------------------------------
-# Map editor (loads saved polygon)
-# -----------------------------------------------------
 @app.get("/map", response_class=HTMLResponse)
 async def map_editor():
     area_data = None
@@ -152,9 +146,6 @@ async def map_editor():
     """
 
 
-# -----------------------------------------------------
-# Save area
-# -----------------------------------------------------
 @app.post("/update-area")
 async def update_area(request: Request):
     data = await request.json()
@@ -177,9 +168,6 @@ async def update_area(request: Request):
     return {"status": "saved"}
 
 
-# -----------------------------------------------------
-# Fetch visible northbound flights
-# -----------------------------------------------------
 @app.get("/flight")
 async def get_flight():
     try:
@@ -202,14 +190,13 @@ async def get_flight():
                     and polygon.contains(Point(f.longitude, f.latitude))
                     and f.altitude > 2000
                     and f.heading is not None
-                    and (f.heading >= 340 or f.heading <= 140)
+                    and (f.heading >= 340 or f.heading <= 90)
                 ):
                     valid.append(f)
             except Exception:
                 continue
 
         if not valid:
-            print("⚠ No outbound flights found")
             if os.path.exists(LAST_FLIGHT_FILE):
                 with open(LAST_FLIGHT_FILE, "r") as f:
                     return json.load(f)
@@ -238,7 +225,6 @@ async def get_flight():
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
 
-        print(f"✅ {data['flight']} to {data['destination']} ({data['aircraft']}) {data['altitude']} ft")
         return data
 
     except Exception as e:
