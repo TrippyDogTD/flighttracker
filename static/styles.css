@@ -118,6 +118,7 @@ body {
   color: #ffd84b;
   perspective: 300px;
   overflow: hidden;
+  position: relative;
 }
 
 .colon {

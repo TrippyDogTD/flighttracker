@@ -12,25 +12,20 @@ fr = FlightRadar24API()
 AREA_FILE = "area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
-
 def load_area():
     if os.path.exists(AREA_FILE):
         with open(AREA_FILE, "r") as f:
             return json.load(f)
     return None
 
-
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    return HTMLResponse(open("static/index.html", "r", encoding="utf-8").read())
-
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_editor():
-    area_data = None
-    if os.path.exists(AREA_FILE):
-        with open(AREA_FILE, "r") as f:
-            area_data = json.load(f)
+    area_data = load_area()
     points_js = (
         json.dumps([(p["lat"], p["lng"]) for p in area_data["points"]])
         if area_data and "points" in area_data
@@ -87,7 +82,6 @@ async def map_editor():
     </html>
     """
 
-
 @app.post("/update-area")
 async def update_area(request: Request):
     data = await request.json()
@@ -105,7 +99,6 @@ async def update_area(request: Request):
     with open(AREA_FILE, "w") as f:
         json.dump({"points": points, "bounds": bounds}, f)
     return {"status": "saved"}
-
 
 @app.get("/flight")
 async def get_flight():
