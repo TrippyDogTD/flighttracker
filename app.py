@@ -41,9 +41,72 @@ async def root(request: Request):
 
 
 @app.get("/map", response_class=HTMLResponse)
-async def map_view(request: Request):
-    return templates.TemplateResponse("map.html", {"request": request})
+async def map_editor():
+    """Interactive map to draw and save the tracking area."""
+    area_data = None
+    if os.path.exists(AREA_FILE):
+        with open(AREA_FILE, "r") as f:
+            area_data = json.load(f)
 
+    points_js = (
+        json.dumps([(p["lat"], p["lng"]) for p in area_data["points"]])
+        if area_data and "points" in area_data
+        else "[]"
+    )
+
+    return f"""
+    <html>
+    <head>
+        <title>Edit Tracking Area</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    </head>
+    <body style="margin:0">
+        <div id="map" style="height:100vh;width:100vw"></div>
+        <script>
+            const map = L.map('map').setView([4.7, -74.1], 11);
+            L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+
+            let currentPolygon = null;
+            const savedPoints = {points_js};
+            if (savedPoints.length > 0) {{
+                currentPolygon = L.polygon(savedPoints, {{color:'cyan'}}).addTo(map);
+                map.fitBounds(currentPolygon.getBounds());
+            }}
+
+            const drawControl = new L.Control.Draw({{
+                draw: {{ polygon: true, polyline:false, circle:false, rectangle:false, marker:false }},
+                edit: {{ featureGroup: currentPolygon ? L.featureGroup([currentPolygon]) : L.featureGroup() }}
+            }});
+            map.addControl(drawControl);
+
+            map.on(L.Draw.Event.CREATED, e => {{
+                if (currentPolygon) map.removeLayer(currentPolygon);
+                currentPolygon = e.layer;
+                map.addLayer(currentPolygon);
+                saveArea(currentPolygon.getLatLngs()[0]);
+            }});
+
+            map.on(L.Draw.Event.EDITED, e => {{
+                const layer = e.layers.getLayers()[0];
+                if (layer) saveArea(layer.getLatLngs()[0]);
+            }});
+
+            async function saveArea(points) {{
+                const coords = points.map(p => ({{lat:p.lat, lng:p.lng}}));
+                await fetch('/update-area', {{
+                    method:'POST',
+                    headers:{{'Content-Type':'application/json'}},
+                    body:JSON.stringify({{points:coords}})
+                }});
+                alert('✅ Area saved!');
+            }}
+        </script>
+    </body>
+    </html>
+    """
 
 @app.post("/update-area")
 async def update_area(area: dict):
@@ -73,9 +136,10 @@ async def get_all_flights():
                     f.longitude
                     and f.latitude
                     and polygon.contains(Point(f.longitude, f.latitude))
-                    and f.altitude > 400
+                    and f.altitude > 2000
                     and f.heading is not None
-                    and (300 <= f.heading <= 360 or 0 <= f.heading <= 30)
+                    and (f.heading >= 340 or f.heading <= 140)
+                    and f.latitude > 4.68
                 ):
                     inside.append(
                         {
