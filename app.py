@@ -17,7 +17,7 @@ LAST_FLIGHT_FILE = "last_flight.json"
 
 
 def load_area():
-    """Load polygon area or create a default one."""
+    """Load or create default area."""
     if not os.path.exists(AREA_FILE):
         area = {
             "points": [
@@ -37,51 +37,84 @@ def load_area():
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """Main flight board."""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_view(request: Request):
-    """Map view for editing area."""
     return templates.TemplateResponse("map.html", {"request": request})
 
 
 @app.post("/update-area")
 async def update_area(area: dict):
-    """Save new editable area."""
     with open(AREA_FILE, "w") as f:
         json.dump(area, f)
     return {"status": "ok"}
 
 
-@app.get("/flight")
-async def get_flight():
-    """Fetch latest flight data within selected area."""
+@app.get("/traffic")
+async def get_all_flights():
+    """Return all flights detected in current area."""
     try:
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         bounds = area_data["bounds"]
 
         flights = fr.get_flights(bounds=bounds)
-
-        valid_flights = []
+        inside = []
         for f in flights:
             try:
-                point = Point(f.longitude, f.latitude)
-                if polygon.contains(point) and f.altitude > 400 and 270 <= f.track <= 360:
-                    valid_flights.append(f)
+                if f.longitude and f.latitude and polygon.contains(Point(f.longitude, f.latitude)):
+                    inside.append(
+                        {
+                            "id": f.id,
+                            "altitude": f.altitude,
+                            "airline": f.airline_iata,
+                            "destination": f.destination_airport_iata,
+                            "lat": f.latitude,
+                            "lng": f.longitude,
+                        }
+                    )
             except Exception:
                 continue
 
-        if not valid_flights:
-            print("⚠ No outbound northbound flights found.")
+        return {"count": len(inside), "flights": inside}
+
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/flight")
+async def get_flight():
+    """Pick one visible flight (any heading, >100 ft)."""
+    try:
+        area_data = load_area()
+        polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
+        bounds = area_data["bounds"]
+        flights = fr.get_flights(bounds=bounds)
+
+        valid = []
+        for f in flights:
+            try:
+                if (
+                    f.longitude
+                    and f.latitude
+                    and polygon.contains(Point(f.longitude, f.latitude))
+                    and f.altitude > 100
+                ):
+                    valid.append(f)
+            except Exception:
+                continue
+
+        if not valid:
+            print("⚠ No flights currently inside area.")
             if os.path.exists(LAST_FLIGHT_FILE):
                 with open(LAST_FLIGHT_FILE, "r") as f:
                     return json.load(f)
-            return JSONResponse(content={"error": "No flights found"}, status_code=200)
+            return {"flight": "--", "destination": "--", "aircraft": "--", "altitude": 0,
+                    "logo": "/static/logos/default.png"}
 
-        chosen = random.choice(valid_flights)
+        chosen = random.choice(valid)
         airline_code = chosen.airline_iata or "default"
 
         data = {
@@ -97,11 +130,11 @@ async def get_flight():
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
 
-        print(f"✅ Showing flight {data['flight']} to {data['destination']}")
+        print(f"✅ Flight {data['flight']}  Dest:{data['destination']}  Alt:{data['altitude']}")
         return data
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print("❌ Error:", e)
         if os.path.exists(LAST_FLIGHT_FILE):
             with open(LAST_FLIGHT_FILE, "r") as f:
                 return json.load(f)
@@ -110,5 +143,4 @@ async def get_flight():
 
 @app.get("/health")
 async def health():
-    """Render health check route."""
     return {"status": "ok"}
