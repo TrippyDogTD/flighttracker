@@ -1,5 +1,5 @@
 body {
-  background-color: #f8e9b0;
+  background-color: #fff5c2;
   color: #ffcc00;
   font-family: "Courier New", monospace;
   text-align: center;
@@ -32,15 +32,6 @@ h1 {
   object-fit: contain;
 }
 
-#map {
-  height: 600px;
-  margin: 20px auto;
-  width: 80%;
-  border-radius: 12px;
-  border: 2px solid #ffcc00;
-  box-shadow: 0 0 15px #ffcc00;
-}
-
 button {
   background: #ffcc00;
   color: black;
@@ -50,8 +41,18 @@ button {
   border-radius: 6px;
   cursor: pointer;
   transition: 0.2s;
+  margin: 10px;
 }
 
 button:hover {
   background: #ffaa00;
+}
+
+#map {
+  height: 600px;
+  margin: 20px auto;
+  width: 80%;
+  border-radius: 12px;
+  border: 2px solid #ffcc00;
+  box-shadow: 0 0 15px #ffcc00;
 }

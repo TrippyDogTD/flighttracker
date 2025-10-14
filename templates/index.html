@@ -7,6 +7,7 @@
 </head>
 <body>
   <h1>✈ LIVE FLIGHT BOARD</h1>
+
   <div class="board">
     <img id="logo" src="/static/logos/default.png" alt="Logo" />
     <div class="info">
@@ -17,6 +18,8 @@
       <p>Altitude <span id="alt">--</span> ft</p>
     </div>
   </div>
+
+  <button onclick="window.location='/map'">🗺 Edit Tracking Area</button>
 
   <script>
     async function updateFlight() {
@@ -31,11 +34,12 @@
         document.getElementById("alt").textContent = data.altitude;
         document.getElementById("logo").src = data.logo || "/static/logos/default.png";
       } catch (e) {
-        console.error("Error:", e);
+        console.error("Error fetching flight:", e);
+        document.getElementById("status").textContent = "No flight data.";
       }
     }
 
-    setInterval(updateFlight, 500); // twice per second
+    setInterval(updateFlight, 500); // update twice per second
     updateFlight();
   </script>
 </body>
