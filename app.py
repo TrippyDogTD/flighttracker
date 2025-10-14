@@ -60,14 +60,10 @@ async def get_all_flights():
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
 
-        # unpack coordinates
-        tl_y = float(b["tl_y"])
-        tl_x = float(b["tl_x"])
-        br_y = float(b["br_y"])
-        br_x = float(b["br_x"])
+        # format bounds string as expected by FlightRadar24API
+        bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
 
-        # pass bounds as separate arguments
-        flights = fr.get_flights(tl_y, tl_x, br_y, br_x)
+        flights = fr.get_flights(bounds=bounds_str)
 
         inside = []
         for f in flights:
@@ -95,29 +91,33 @@ async def get_all_flights():
 
 @app.get("/flight")
 async def get_flight():
-    """Pick one visible flight (any heading, >100 ft)."""
+    """Pick one visible northbound flight (>400 ft)."""
     try:
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
 
-        tl_y = float(b["tl_y"])
-        tl_x = float(b["tl_x"])
-        br_y = float(b["br_y"])
-        br_x = float(b["br_x"])
+        bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
 
-        flights = fr.get_flights(tl_y, tl_x, br_y, br_x)
+        flights = fr.get_flights(bounds=bounds_str)
 
         valid = []
         for f in flights:
             try:
-                if f.longitude and f.latitude and polygon.contains(Point(f.longitude, f.latitude)) and f.altitude > 100:
+                if (
+                    f.longitude
+                    and f.latitude
+                    and polygon.contains(Point(f.longitude, f.latitude))
+                    and f.altitude > 400
+                    and f.heading is not None
+                    and 300 <= f.heading <= 30  # northbound filter (wrap around 0)
+                ):
                     valid.append(f)
             except Exception:
                 continue
 
         if not valid:
-            print("⚠ No flights inside area.")
+            print("⚠ No outbound flights found.")
             if os.path.exists(LAST_FLIGHT_FILE):
                 with open(LAST_FLIGHT_FILE, "r") as f:
                     return json.load(f)
