@@ -12,7 +12,6 @@ fr = FlightRadar24API()
 AREA_FILE = "area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
-
 def load_area():
     if os.path.exists(AREA_FILE):
         with open(AREA_FILE, "r") as f:
@@ -22,53 +21,69 @@ def load_area():
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    # Inject styles directly so the clock stays one line and looks crisp
+    # Fixed CSS for single-line stable clock
     clock_css = """
     <style>
       .clock-frame {
-        min-width: 22rem;
+        min-width: 20rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
       }
+
       .clock-flip {
-        display: inline-flex;
-        flex-wrap: nowrap;
+        display: flex;
+        flex-direction: row;
         align-items: center;
         justify-content: center;
+        gap: .25rem;
         white-space: nowrap;
         overflow: hidden;
-        min-width: 18rem;
+        transform: translateZ(0);
       }
-      .clock-flip .digit, .clock-flip .colon {
+
+      .clock-flip .digit,
+      .clock-flip .colon {
+        width: 2.3rem;
+        height: 3rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 2.2rem;
-        height: 2.8rem;
-        margin: 0 .08rem;
-        background: #111;
-        border-radius: .3rem;
         font-family: "IBM Plex Mono", monospace;
-        font-size: 2rem;
+        font-size: 2.1rem;
         font-weight: 600;
         color: #ffd84b;
-        box-shadow: inset 0 -2px 0 #000, 0 0 10px #0007;
+        background: #111;
+        border-radius: .3rem;
+        box-shadow: inset 0 -2px 0 #000, 0 0 8px #000a;
+        transform-origin: center;
       }
+
       .clock-flip .colon {
         background: none;
         box-shadow: none;
         width: 1rem;
       }
-      .clock-flip .digit.flip {
-        animation: flap .6s ease both;
+
+      .digit.flip {
+        animation: flap .4s ease both;
       }
+
       @keyframes flap {
         0% { transform: rotateX(0deg); }
-        49% { transform: rotateX(-90deg); filter: brightness(.8); }
-        50% { transform: rotateX(90deg); filter: brightness(.8); }
+        50% { transform: rotateX(-90deg); filter: brightness(.8); }
         100% { transform: rotateX(0deg); filter: brightness(1); }
+      }
+
+      .logo-over-clock img {
+        max-width: 120px;
+        height: auto;
+        background: rgba(255,255,255,0.05);
+        border-radius: 10px;
+        padding: 6px;
+        box-shadow: 0 0 15px #0008;
+        margin-bottom: .8rem;
       }
     </style>
     """
@@ -97,7 +112,7 @@ async def home():
 
                 <div class="clock-frame">
                     <div class="logo-over-clock">
-                        <img id="logo" src="/static/logos/default.png" alt="Logo">
+                        <img id="logo" src="/static/logos/SS.png" alt="Logo">
                     </div>
                     <div class="clock-label">UTC</div>
                     <div id="utc-clock" class="clock-flip"></div>
@@ -108,62 +123,39 @@ async def home():
         </div>
 
         <script>
-            // ======= Flip helpers =======
-            function flipText(el, newText) {{
-                if (el.innerText === newText) return;
-                el.classList.remove('flip-anim');
-                void el.offsetWidth;
-                el.classList.add('flip-anim');
-                setTimeout(() => {{ el.innerText = newText; }}, 250);
-            }}
-
-            async function updateFlight() {{
-                try {{
-                    const res = await fetch('/flight');
-                    const data = await res.json();
-                    flipText(document.getElementById('flight'), data.flight || '--');
-                    flipText(document.getElementById('destination'), data.destination || '--');
-                    flipText(document.getElementById('aircraft'), data.aircraft || '--');
-                    flipText(document.getElementById('altitude'), data.altitude || '--');
-                    document.getElementById('logo').src = data.logo || '/static/logos/default.png';
-                }} catch (e) {{
-                    console.warn('Flight update failed', e);
-                }}
-            }}
-
-            // ======= Split-flap clock =======
+            // ====== CLOCK INIT ======
             function initClock() {{
                 const c = document.getElementById('utc-clock');
                 if (c.dataset.ready) return;
                 c.dataset.ready = 'true';
                 c.innerHTML = '';
-                function addDigit() {{
+                const addDigit = () => {{
                     const d = document.createElement('div');
                     d.className = 'digit';
                     d.dataset.value = '0';
                     d.textContent = '0';
                     c.appendChild(d);
-                }}
-                function addColon() {{
+                }};
+                const addColon = () => {{
                     const col = document.createElement('div');
                     col.className = 'colon';
                     col.textContent = ':';
                     c.appendChild(col);
-                }}
+                }};
                 addDigit(); addDigit(); addColon(); addDigit(); addDigit(); addColon(); addDigit(); addDigit();
             }}
 
             function updateClock() {{
                 const now = new Date();
                 const t = now.toISOString().slice(11, 19);
-                const digitsArray = t.replaceAll(':','').split('');
-                const els = Array.from(document.querySelectorAll('#utc-clock .digit'));
+                const digits = t.replaceAll(':', '').split('');
+                const els = document.querySelectorAll('#utc-clock .digit');
                 for (let i = 0; i < 6; i++) {{
                     const el = els[i];
-                    const next = digitsArray[i];
+                    const next = digits[i];
                     if (el.dataset.value !== next) {{
                         el.classList.add('flip');
-                        setTimeout(() => el.classList.remove('flip'), 600);
+                        setTimeout(() => el.classList.remove('flip'), 400);
                         el.dataset.value = next;
                         el.textContent = next;
                     }}
@@ -173,6 +165,31 @@ async def home():
             initClock();
             updateClock();
             setInterval(updateClock, 1000);
+
+            // ====== FLIGHT FETCH ======
+            function flipText(el, txt) {{
+                if (el.innerText === txt) return;
+                el.innerText = txt;
+            }}
+
+            async function updateFlight() {{
+                try {{
+                    const res = await fetch('/flight');
+                    const data = await res.json();
+
+                    flipText(document.getElementById('flight'), data.flight || 'No traffic northbound');
+                    flipText(document.getElementById('destination'), data.destination || '--');
+                    flipText(document.getElementById('aircraft'), data.aircraft || '--');
+                    flipText(document.getElementById('altitude'), data.altitude || '--');
+
+                    const logo = document.getElementById('logo');
+                    logo.src = data.logo || '/static/logos/SS.png';
+                }} catch (e) {{
+                    console.log('updateFlight error', e);
+                    document.getElementById('flight').innerText = 'No traffic northbound';
+                }}
+            }}
+
             updateFlight();
             setInterval(updateFlight, 7000);
         </script>
@@ -288,34 +305,33 @@ async def get_flight():
             except Exception:
                 continue
         if not valid:
-            data = {{
+            data = {
                 "flight": "No traffic northbound",
                 "destination": "--",
                 "aircraft": "--",
                 "altitude": "--",
                 "logo": "/static/logos/SS.png" if os.path.exists("static/logos/SS.png") else "/static/logos/default.png",
-            }}
+            }
             with open(LAST_FLIGHT_FILE, "w") as f:
                 json.dump(data, f)
             return data
         chosen = random.choice(valid)
         airline_code = (chosen.airline_iata or "").strip() or "default"
-        logo_path = f"static/logos/{{airline_code}}.png"
-        logo_url = f"/static/logos/{{airline_code}}.png" if os.path.exists(logo_path) else "/static/logos/default.png"
-        data = {{
+        logo_path = f"static/logos/{airline_code}.png"
+        logo_url = f"/static/logos/{airline_code}.png" if os.path.exists(logo_path) else "/static/logos/default.png"
+        data = {
             "flight": (chosen.callsign or chosen.id or "--"),
             "destination": (chosen.destination_airport_iata or "--"),
             "aircraft": (chosen.aircraft_code or "--"),
-            "altitude": f"{{int(chosen.altitude)}} ft" if chosen.altitude else "--",
+            "altitude": f"{int(chosen.altitude)} ft" if chosen.altitude else "--",
             "logo": logo_url,
-        }}
+        }
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
-        print(f"✅ {{data['flight']}} → {{data['destination']}} ({{data['aircraft']}}) {{data['altitude']}}")
         return data
     except Exception as e:
         print("❌ Flight error:", e)
         if os.path.exists(LAST_FLIGHT_FILE):
             with open(LAST_FLIGHT_FILE, "r") as f:
                 return json.load(f)
-        return JSONResponse(content={{"error": str(e)}}, status_code=500)
+        return JSONResponse(content={"error": str(e)}, status_code=500)
