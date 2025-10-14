@@ -60,15 +60,15 @@ async def get_all_flights():
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
 
-        # unpack the numbers (must be floats, not dict)
-        tl_y, tl_x, br_y, br_x = (
-            float(b["tl_y"]),
-            float(b["tl_x"]),
-            float(b["br_y"]),
-            float(b["br_x"]),
-        )
+        # unpack coordinates
+        tl_y = float(b["tl_y"])
+        tl_x = float(b["tl_x"])
+        br_y = float(b["br_y"])
+        br_x = float(b["br_x"])
 
-        flights = fr.get_flights(bounds=(tl_y, tl_x, br_y, br_x))
+        # pass bounds as separate arguments
+        flights = fr.get_flights(tl_y, tl_x, br_y, br_x)
+
         inside = []
         for f in flights:
             try:
@@ -100,14 +100,13 @@ async def get_flight():
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
-        tl_y, tl_x, br_y, br_x = (
-            float(b["tl_y"]),
-            float(b["tl_x"]),
-            float(b["br_y"]),
-            float(b["br_x"]),
-        )
 
-        flights = fr.get_flights(bounds=(tl_y, tl_x, br_y, br_x))
+        tl_y = float(b["tl_y"])
+        tl_x = float(b["tl_x"])
+        br_y = float(b["br_y"])
+        br_x = float(b["br_x"])
+
+        flights = fr.get_flights(tl_y, tl_x, br_y, br_x)
 
         valid = []
         for f in flights:
