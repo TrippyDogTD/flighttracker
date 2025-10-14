@@ -1,48 +1,75 @@
+import os, json, random
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from FlightRadar24 import FlightRadar24API
 from shapely.geometry import Point, Polygon
-import json, random, os
+from FlightRadar24 import FlightRadar24API
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
 
 fr = FlightRadar24API()
 
 AREA_FILE = "area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
-
+# -----------------------------------------------------
+# Utility
+# -----------------------------------------------------
 def load_area():
-    """Load or create default area."""
-    if not os.path.exists(AREA_FILE):
-        area = {
-            "points": [
-                {"lat": 4.74, "lng": -74.16},
-                {"lat": 4.74, "lng": -74.05},
-                {"lat": 4.66, "lng": -74.05},
-                {"lat": 4.66, "lng": -74.16},
-            ],
-            "bounds": {"tl_y": 4.74, "tl_x": -74.16, "br_y": 4.66, "br_x": -74.05},
-        }
-        with open(AREA_FILE, "w") as f:
-            json.dump(area, f)
-        return area
-    with open(AREA_FILE, "r") as f:
-        return json.load(f)
+    if os.path.exists(AREA_FILE):
+        with open(AREA_FILE, "r") as f:
+            return json.load(f)
+    return None
 
 
+# -----------------------------------------------------
+# Home page
+# -----------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def home():
+    return """
+    <html>
+    <head>
+        <title>Live Flight Board</title>
+        <link rel="stylesheet" href="/static/styles.css">
+    </head>
+    <body>
+        <h1>✈ LIVE FLIGHT BOARD</h1>
+        <div class="board">
+            <img id="logo" src="/static/logos/default.png" alt="Logo">
+            <div>
+                <p id="flight">Flight --</p>
+                <p id="destination">Destination --</p>
+                <p id="aircraft">Aircraft --</p>
+                <p id="altitude">Altitude 0 ft</p>
+            </div>
+        </div>
+        <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
+
+        <script>
+            async function updateFlight() {
+                const res = await fetch('/flight');
+                const data = await res.json();
+                document.getElementById('flight').innerText = 'Flight ' + (data.flight || '--');
+                document.getElementById('destination').innerText = 'Destination ' + (data.destination || '--');
+                document.getElementById('aircraft').innerText = 'Aircraft ' + (data.aircraft || '--');
+                document.getElementById('altitude').innerText = 'Altitude ' + (data.altitude || 0) + ' ft';
+                document.getElementById('logo').src = data.logo;
+            }
+            updateFlight();
+            setInterval(updateFlight, 8000);
+        </script>
+    </body>
+    </html>
+    """
 
 
+# -----------------------------------------------------
+# Map editor (loads saved polygon)
+# -----------------------------------------------------
 @app.get("/map", response_class=HTMLResponse)
 async def map_editor():
-    """Interactive map to draw and save the tracking area."""
     area_data = None
     if os.path.exists(AREA_FILE):
         with open(AREA_FILE, "r") as f:
@@ -59,9 +86,9 @@ async def map_editor():
     <head>
         <title>Edit Tracking Area</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
     </head>
     <body style="margin:0">
         <div id="map" style="height:100vh;width:100vw"></div>
@@ -77,7 +104,7 @@ async def map_editor():
             }}
 
             const drawControl = new L.Control.Draw({{
-                draw: {{ polygon: true, polyline:false, circle:false, rectangle:false, marker:false }},
+                draw: {{ polygon:true, polyline:false, circle:false, rectangle:false, marker:false }},
                 edit: {{ featureGroup: currentPolygon ? L.featureGroup([currentPolygon]) : L.featureGroup() }}
             }});
             map.addControl(drawControl);
@@ -108,30 +135,51 @@ async def map_editor():
     </html>
     """
 
+
+# -----------------------------------------------------
+# Save area
+# -----------------------------------------------------
 @app.post("/update-area")
-async def update_area(area: dict):
+async def update_area(request: Request):
+    data = await request.json()
+    points = data.get("points")
+    if not points:
+        return {"error": "No points provided"}
+
+    latitudes = [p["lat"] for p in points]
+    longitudes = [p["lng"] for p in points]
+    bounds = {
+        "tl_y": max(latitudes),
+        "tl_x": min(longitudes),
+        "br_y": min(latitudes),
+        "br_x": max(longitudes),
+    }
+
     with open(AREA_FILE, "w") as f:
-        json.dump(area, f)
-    return {"status": "ok"}
+        json.dump({"points": points, "bounds": bounds}, f)
+
+    return {"status": "saved"}
 
 
-from fastapi.responses import HTMLResponse
-
-@app.get("/traffic")
-async def get_all_flights():
-    """Return all flights detected in current area (for backend use)."""
+# -----------------------------------------------------
+# Fetch visible northbound flights
+# -----------------------------------------------------
+@app.get("/flight")
+async def get_flight():
     try:
         area_data = load_area()
+        if not area_data:
+            raise Exception("No area defined")
+
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
         bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
 
         flights = fr.get_flights(bounds=bounds_str)
-        inside = []
+        valid = []
 
         for f in flights:
             try:
-                # only outbound flights, ignore inbound and low altitude
                 if (
                     f.longitude
                     and f.latitude
@@ -139,56 +187,13 @@ async def get_all_flights():
                     and f.altitude > 2000
                     and f.heading is not None
                     and (f.heading >= 340 or f.heading <= 140)
-                    and f.latitude > 4.68
-                ):
-                    inside.append(
-                        {
-                            "id": f.id,
-                            "altitude": f.altitude,
-                            "airline": f.airline_iata,
-                            "destination": f.destination_airport_iata,
-                            "lat": f.latitude,
-                            "lng": f.longitude,
-                            "heading": f.heading,
-                        }
-                    )
-            except Exception:
-                continue
-
-        return {"count": len(inside), "flights": inside}
-
-    except Exception as e:
-        print("❌ Traffic error:", e)
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
-
-@app.get("/flight")
-async def get_flight():
-    """Pick one visible northbound flight (>400 ft)."""
-    try:
-        area_data = load_area()
-        polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
-        b = area_data["bounds"]
-        bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
-        flights = fr.get_flights(bounds=bounds_str)
-
-        valid = []
-        for f in flights:
-            try:
-                if (
-                    f.longitude
-                    and f.latitude
-                    and polygon.contains(Point(f.longitude, f.latitude))
-                    and f.altitude > 400
-                    and f.heading is not None
-                    and (300 <= f.heading <= 360 or 0 <= f.heading <= 30)
                 ):
                     valid.append(f)
             except Exception:
                 continue
 
         if not valid:
-            print("⚠ No outbound flights found.")
+            print("⚠ No outbound flights found")
             if os.path.exists(LAST_FLIGHT_FILE):
                 with open(LAST_FLIGHT_FILE, "r") as f:
                     return json.load(f)
@@ -203,20 +208,21 @@ async def get_flight():
         chosen = random.choice(valid)
         airline_code = chosen.airline_iata or "default"
 
+        logo_path = f"static/logos/{airline_code}.png"
+        logo_url = f"/static/logos/{airline_code}.png" if os.path.exists(logo_path) else "/static/logos/default.png"
+
         data = {
-            "flight": chosen.id or "--",
+            "flight": chosen.callsign or chosen.id or "--",
             "destination": chosen.destination_airport_iata or "--",
             "aircraft": chosen.aircraft_code or "--",
             "altitude": int(chosen.altitude),
-            "logo": f"/static/logos/{airline_code}.png"
-            if os.path.exists(f"static/logos/{airline_code}.png")
-            else "/static/logos/default.png",
+            "logo": logo_url,
         }
 
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
 
-        print(f"✅ Outbound flight {data['flight']} to {data['destination']} at {data['altitude']} ft")
+        print(f"✅ {data['flight']} to {data['destination']} ({data['aircraft']}) {data['altitude']} ft")
         return data
 
     except Exception as e:
@@ -225,50 +231,3 @@ async def get_flight():
             with open(LAST_FLIGHT_FILE, "r") as f:
                 return json.load(f)
         return JSONResponse(content={"error": str(e)}, status_code=500)
-
-
-@app.get("/traffic-map", response_class=HTMLResponse)
-async def traffic_map():
-    """Visual debug map for area and live flights."""
-    area_data = load_area()
-    points = [(p["lat"], p["lng"]) for p in area_data["points"]]
-    polygon_js = json.dumps(points)
-    return f"""
-    <html>
-    <head>
-        <title>Traffic Map</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    </head>
-    <body style="margin:0">
-        <div id="map" style="height:100vh;width:100vw"></div>
-        <script>
-            const map = L.map('map').setView([{points[0][0]}, {points[0][1]}], 12);
-            L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
-
-            const polygon = L.polygon({polygon_js}, {{color: 'cyan'}}).addTo(map);
-            map.fitBounds(polygon.getBounds());
-
-            async function updateFlights() {{
-                const res = await fetch('/traffic');
-                const data = await res.json();
-                if (data.flights) {{
-                    data.flights.forEach(f => {{
-                        L.circleMarker([f.lat, f.lng], {{
-                            radius: 6,
-                            color: 'yellow'
-                        }}).bindTooltip(`${{f.airline || '??'}} → ${{f.destination || '--'}}`).addTo(map);
-                    }});
-                }}
-            }}
-            updateFlights();
-            setInterval(updateFlights, 8000);
-        </script>
-    </body>
-    </html>
-    """
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
