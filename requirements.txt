@@ -5,3 +5,4 @@ flightradarapi==1.4.0
 shapely==2.0.6
 requests==2.32.3
 python-multipart==0.0.9
+beautifulsoup4==4.12.3
