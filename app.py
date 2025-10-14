@@ -58,9 +58,17 @@ async def get_all_flights():
     try:
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
-        bounds = area_data["bounds"]
+        b = area_data["bounds"]
 
-        flights = fr.get_flights(bounds=bounds)
+        # unpack the numbers (must be floats, not dict)
+        tl_y, tl_x, br_y, br_x = (
+            float(b["tl_y"]),
+            float(b["tl_x"]),
+            float(b["br_y"]),
+            float(b["br_x"]),
+        )
+
+        flights = fr.get_flights(bounds=(tl_y, tl_x, br_y, br_x))
         inside = []
         for f in flights:
             try:
@@ -81,6 +89,7 @@ async def get_all_flights():
         return {"count": len(inside), "flights": inside}
 
     except Exception as e:
+        print("❌ Traffic error:", e)
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
@@ -90,29 +99,36 @@ async def get_flight():
     try:
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
-        bounds = area_data["bounds"]
-        flights = fr.get_flights(bounds=bounds)
+        b = area_data["bounds"]
+        tl_y, tl_x, br_y, br_x = (
+            float(b["tl_y"]),
+            float(b["tl_x"]),
+            float(b["br_y"]),
+            float(b["br_x"]),
+        )
+
+        flights = fr.get_flights(bounds=(tl_y, tl_x, br_y, br_x))
 
         valid = []
         for f in flights:
             try:
-                if (
-                    f.longitude
-                    and f.latitude
-                    and polygon.contains(Point(f.longitude, f.latitude))
-                    and f.altitude > 100
-                ):
+                if f.longitude and f.latitude and polygon.contains(Point(f.longitude, f.latitude)) and f.altitude > 100:
                     valid.append(f)
             except Exception:
                 continue
 
         if not valid:
-            print("⚠ No flights currently inside area.")
+            print("⚠ No flights inside area.")
             if os.path.exists(LAST_FLIGHT_FILE):
                 with open(LAST_FLIGHT_FILE, "r") as f:
                     return json.load(f)
-            return {"flight": "--", "destination": "--", "aircraft": "--", "altitude": 0,
-                    "logo": "/static/logos/default.png"}
+            return {
+                "flight": "--",
+                "destination": "--",
+                "aircraft": "--",
+                "altitude": 0,
+                "logo": "/static/logos/default.png",
+            }
 
         chosen = random.choice(valid)
         airline_code = chosen.airline_iata or "default"
@@ -130,11 +146,11 @@ async def get_flight():
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
 
-        print(f"✅ Flight {data['flight']}  Dest:{data['destination']}  Alt:{data['altitude']}")
+        print(f"✅ Flight {data['flight']} Dest:{data['destination']} Alt:{data['altitude']}")
         return data
 
     except Exception as e:
-        print("❌ Error:", e)
+        print("❌ Flight error:", e)
         if os.path.exists(LAST_FLIGHT_FILE):
             with open(LAST_FLIGHT_FILE, "r") as f:
                 return json.load(f)
