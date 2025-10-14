@@ -1,46 +1,91 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Live Flight Board</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <meta charset="utf-8">
+  <title>Live Flight Board ✈✈</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <h1>✈ LIVE FLIGHT BOARD</h1>
-
-  <div class="board">
-    <img id="logo" src="/static/logos/default.png" alt="Logo" />
-    <div class="info">
-      <p id="status">Loading...</p>
-      <p>Flight <span id="flight">--</span></p>
-      <p>Destination <span id="dest">--</span></p>
-      <p>Aircraft <span id="aircraft">--</span></p>
-      <p>Altitude <span id="alt">--</span> ft</p>
+  <div class="flipboard">
+    <div class="header">
+      <span class="edit-button" onclick="window.location='/map'">✈</span>
+      LIVE FLIGHT BOARD ✈
     </div>
+
+    <div class="flight-panel">
+      <div class="info">
+        <div class="flip-row"><span class="label">Flight:</span><span id="flight">--</span></div>
+        <div class="flip-row"><span class="label">Destination:</span><span id="destination">--</span></div>
+        <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft">--</span></div>
+        <div class="flip-row"><span class="label">Altitude:</span><span id="altitude">--</span></div>
+      </div>
+
+      <div class="clock-frame">
+        <img id="logo" src="/static/logos/SS.png" alt="Logo">
+        <div class="clock-label">UTC</div>
+        <div id="clock" class="clock"></div>
+      </div>
+    </div>
+
+    <div class="signature">Designed by <span>TrippyDog ✈</span></div>
   </div>
 
-  <button onclick="window.location='/map'">🗺 Edit Tracking Area</button>
-
   <script>
-    async function updateFlight() {
-      try {
-        const res = await fetch("/flight");
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        document.getElementById("status").textContent = "";
-        document.getElementById("flight").textContent = data.flight;
-        document.getElementById("dest").textContent = data.destination;
-        document.getElementById("aircraft").textContent = data.aircraft;
-        document.getElementById("alt").textContent = data.altitude;
-        document.getElementById("logo").src = data.logo || "/static/logos/default.png";
-      } catch (e) {
-        console.error("Error fetching flight:", e);
-        document.getElementById("status").textContent = "No flight data.";
+    // Initialize clock
+    const clock = document.getElementById("clock");
+    const makeDigit = (v="0")=>{
+      const d=document.createElement("div");
+      d.className="digit";
+      d.textContent=v;
+      d.dataset.value=v;
+      clock.appendChild(d);
+      return d;
+    };
+    const makeColon=()=>{
+      const c=document.createElement("div");
+      c.className="colon";
+      c.textContent=":";
+      clock.appendChild(c);
+    };
+    for(let i=0;i<2;i++) makeDigit();
+    makeColon();
+    for(let i=0;i<2;i++) makeDigit();
+    makeColon();
+    for(let i=0;i<2;i++) makeDigit();
+
+    const digits=[...clock.querySelectorAll(".digit")];
+    function updateClock(){
+      const now=new Date();
+      const t=now.toISOString().slice(11,19).replaceAll(":","");
+      t.split("").forEach((n,i)=>{
+        const el=digits[i];
+        if(el.dataset.value!==n){
+          el.dataset.value=n;
+          el.textContent=n;
+          el.classList.remove("flip");
+          void el.offsetWidth;
+          el.classList.add("flip");
+        }
+      });
+    }
+    setInterval(updateClock,1000);
+    updateClock();
+
+    async function updateFlight(){
+      try{
+        const res=await fetch("/flight");
+        const d=await res.json();
+        document.getElementById("flight").textContent=d.flight||"No traffic northbound";
+        document.getElementById("destination").textContent=d.destination||"--";
+        document.getElementById("aircraft").textContent=d.aircraft||"--";
+        document.getElementById("altitude").textContent=d.altitude||"--";
+        document.getElementById("logo").src=d.logo||"/static/logos/SS.png";
+      }catch(e){
+        document.getElementById("flight").textContent="No traffic northbound";
       }
     }
-
-    setInterval(updateFlight, 500); // update twice per second
     updateFlight();
+    setInterval(updateFlight,7000);
   </script>
 </body>
 </html>

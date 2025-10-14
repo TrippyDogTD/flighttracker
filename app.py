@@ -12,6 +12,7 @@ fr = FlightRadar24API()
 AREA_FILE = "area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
+
 def load_area():
     if os.path.exists(AREA_FILE):
         with open(AREA_FILE, "r") as f:
@@ -21,181 +22,7 @@ def load_area():
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    # Fixed CSS for single-line stable clock
-    clock_css = """
-    <style>
-      .clock-frame {
-        min-width: 20rem;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .clock-flip {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: center;
-        gap: .25rem;
-        white-space: nowrap;
-        overflow: hidden;
-        transform: translateZ(0);
-      }
-
-      .clock-flip .digit,
-      .clock-flip .colon {
-        width: 2.3rem;
-        height: 3rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 2.1rem;
-        font-weight: 600;
-        color: #ffd84b;
-        background: #111;
-        border-radius: .3rem;
-        box-shadow: inset 0 -2px 0 #000, 0 0 8px #000a;
-        transform-origin: center;
-      }
-
-      .clock-flip .colon {
-        background: none;
-        box-shadow: none;
-        width: 1rem;
-      }
-
-      .digit.flip {
-        animation: flap .4s ease both;
-      }
-
-      @keyframes flap {
-        0% { transform: rotateX(0deg); }
-        50% { transform: rotateX(-90deg); filter: brightness(.8); }
-        100% { transform: rotateX(0deg); filter: brightness(1); }
-      }
-
-      .logo-over-clock img {
-        max-width: 120px;
-        height: auto;
-        background: rgba(255,255,255,0.05);
-        border-radius: 10px;
-        padding: 6px;
-        box-shadow: 0 0 15px #0008;
-        margin-bottom: .8rem;
-      }
-    </style>
-    """
-
-    return f"""
-    <html>
-    <head>
-        <title>Live Flight Board ✈✈</title>
-        <link rel="stylesheet" href="/static/styles.css">
-        {clock_css}
-    </head>
-    <body>
-        <div class="flipboard">
-            <div class="header">
-                <span class="edit-button" onclick="window.location='/map'">✈</span>
-                LIVE FLIGHT BOARD ✈
-            </div>
-
-            <div class="flight-panel">
-                <div class="info">
-                    <div class="flip-row"><span class="label">Flight:</span><span id="flight" class="flip">--</span></div>
-                    <div class="flip-row"><span class="label">Destination:</span><span id="destination" class="flip">--</span></div>
-                    <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft" class="flip">--</span></div>
-                    <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">--</span></div>
-                </div>
-
-                <div class="clock-frame">
-                    <div class="logo-over-clock">
-                        <img id="logo" src="/static/logos/SS.png" alt="Logo">
-                    </div>
-                    <div class="clock-label">UTC</div>
-                    <div id="utc-clock" class="clock-flip"></div>
-                </div>
-            </div>
-
-            <div class="signature">Designed by <span>TrippyDog ✈</span></div>
-        </div>
-
-        <script>
-            // ====== CLOCK INIT ======
-            function initClock() {{
-                const c = document.getElementById('utc-clock');
-                if (c.dataset.ready) return;
-                c.dataset.ready = 'true';
-                c.innerHTML = '';
-                const addDigit = () => {{
-                    const d = document.createElement('div');
-                    d.className = 'digit';
-                    d.dataset.value = '0';
-                    d.textContent = '0';
-                    c.appendChild(d);
-                }};
-                const addColon = () => {{
-                    const col = document.createElement('div');
-                    col.className = 'colon';
-                    col.textContent = ':';
-                    c.appendChild(col);
-                }};
-                addDigit(); addDigit(); addColon(); addDigit(); addDigit(); addColon(); addDigit(); addDigit();
-            }}
-
-            function updateClock() {{
-                const now = new Date();
-                const t = now.toISOString().slice(11, 19);
-                const digits = t.replaceAll(':', '').split('');
-                const els = document.querySelectorAll('#utc-clock .digit');
-                for (let i = 0; i < 6; i++) {{
-                    const el = els[i];
-                    const next = digits[i];
-                    if (el.dataset.value !== next) {{
-                        el.classList.add('flip');
-                        setTimeout(() => el.classList.remove('flip'), 400);
-                        el.dataset.value = next;
-                        el.textContent = next;
-                    }}
-                }}
-            }}
-
-            initClock();
-            updateClock();
-            setInterval(updateClock, 1000);
-
-            // ====== FLIGHT FETCH ======
-            function flipText(el, txt) {{
-                if (el.innerText === txt) return;
-                el.innerText = txt;
-            }}
-
-            async function updateFlight() {{
-                try {{
-                    const res = await fetch('/flight');
-                    const data = await res.json();
-
-                    flipText(document.getElementById('flight'), data.flight || 'No traffic northbound');
-                    flipText(document.getElementById('destination'), data.destination || '--');
-                    flipText(document.getElementById('aircraft'), data.aircraft || '--');
-                    flipText(document.getElementById('altitude'), data.altitude || '--');
-
-                    const logo = document.getElementById('logo');
-                    logo.src = data.logo || '/static/logos/SS.png';
-                }} catch (e) {{
-                    console.log('updateFlight error', e);
-                    document.getElementById('flight').innerText = 'No traffic northbound';
-                }}
-            }}
-
-            updateFlight();
-            setInterval(updateFlight, 7000);
-        </script>
-    </body>
-    </html>
-    """
+    return HTMLResponse(open("static/index.html", "r", encoding="utf-8").read())
 
 
 @app.get("/map", response_class=HTMLResponse)
@@ -204,7 +31,6 @@ async def map_editor():
     if os.path.exists(AREA_FILE):
         with open(AREA_FILE, "r") as f:
             area_data = json.load(f)
-
     points_js = (
         json.dumps([(p["lat"], p["lng"]) for p in area_data["points"]])
         if area_data and "points" in area_data

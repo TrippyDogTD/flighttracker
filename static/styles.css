@@ -1,246 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
+
 body {
+  background: radial-gradient(circle at 50% 10%, #111, #000);
+  color: #ffd84b;
+  font-family: "IBM Plex Mono", monospace;
   margin: 0;
-  height: 100vh;
-  background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-family: 'Courier New', monospace;
-  color: #ffcc00;
+  overflow: hidden;
 }
 
 .flipboard {
-  width: 100vw;
-  height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  position: relative;
+  justify-content: center;
+  height: 100vh;
+  gap: 1rem;
 }
 
 .header {
-  font-size: 2.5em;
-  margin-bottom: 30px;
-  text-shadow: 0 0 20px rgba(255, 230, 0, 0.7);
-  color: #ffe97a;
-  letter-spacing: 4px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  font-size: 2rem;
+  letter-spacing: 0.4rem;
+  text-shadow: 0 0 25px #ffda00;
+  margin-bottom: 0.5rem;
 }
 
 .edit-button {
   cursor: pointer;
-  font-size: 1.2em;
-  color: #ffcc00;
-  text-shadow: 0 0 10px rgba(255,255,100,0.7);
-  transition: transform 0.2s;
-}
-.edit-button:hover {
-  transform: scale(1.2);
-  color: #ffee77;
+  margin-right: 0.5rem;
+  filter: brightness(1.3);
 }
 
 .flight-panel {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  background-color: #0d0d0d;
-  padding: 50px 80px;
-  border-radius: 20px;
-  box-shadow: 0 0 40px rgba(255, 230, 0, 0.25),
-              inset 0 0 10px rgba(255, 230, 0, 0.15);
+  justify-content: center;
+  background: #111;
+  box-shadow: 0 0 30px #ffda0022;
+  border-radius: 1rem;
+  padding: 1rem 2rem;
+  gap: 2rem;
 }
 
 .info {
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  margin-right: 80px;
+  gap: 0.6rem;
 }
 
 .flip-row {
-  background-color: #1a1a1a;
-  border-radius: 6px;
-  padding: 10px 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: inset 0 -2px 0 #000, inset 0 2px 0 #333;
+  justify-content: flex-start;
+  gap: 0.8rem;
+  background: #1a1a1a;
+  padding: 0.4rem 1rem;
+  border-radius: 0.3rem;
+  box-shadow: inset 0 -1px 2px #000;
 }
 
 .label {
-  color: #ffdd55;
-  font-weight: bold;
-  text-shadow: 0 0 8px rgba(255, 255, 0, 0.3);
+  color: #ffd84b;
+  font-weight: 600;
 }
 
-.flip {
-  background: #111;
-  color: #ffe97a;
-  padding: 6px 16px;
-  border-radius: 4px;
-  display: inline-block;
-  min-width: 120px;
-  font-size: 1.5em;
-  font-weight: bold;
+#flight, #destination, #aircraft, #altitude {
+  background: #000;
+  color: #ffd84b;
+  padding: 0.2rem 0.8rem;
+  border-radius: 0.2rem;
+  font-weight: 600;
+  min-width: 7rem;
   text-align: left;
 }
 
-/* Clock & logo section */
 .clock-frame {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-left: 2px solid #333;
-  padding-left: 40px;
-  position: relative;
 }
 
-.logo-over-clock {
-  position: absolute;
-  top: -90px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.logo-over-clock img {
-  width: 130px;
-  height: 130px;
+#logo {
+  width: 100px;
+  height: 100px;
   object-fit: contain;
-  filter: drop-shadow(0 0 12px rgba(255, 240, 0, 0.3));
+  background: rgba(255,255,255,0.05);
+  border-radius: 0.5rem;
+  margin-bottom: 0.6rem;
+  box-shadow: 0 0 10px #0007;
 }
 
 .clock-label {
-  font-size: 1em;
-  color: #ffdd77;
-  margin-bottom: 10px;
-  margin-top: 40px;
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
 }
 
-/* Split-flap digits */
-.clock-flip {
+.clock {
   display: flex;
-  gap: 5px;
-}
-
-.digit {
-  position: relative;
-  width: 36px;
-  height: 50px;
-  background: #111;
-  border-radius: 4px;
-  overflow: hidden;
-  text-align: center;
-  font-size: 2.2em;
-  color: #ffcc00;
-  box-shadow: inset 0 -2px 0 #000, inset 0 2px 0 #333;
-  perspective: 300px;
-}
-
-.digit::before,
-.digit::after {
-  content: attr(data-value);
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 50%;
-  line-height: 25px;
-  overflow: hidden;
-  background: #111;
-  color: #ffcc00;
-}
-
-.digit::before {
-  top: 0;
-  border-bottom: 1px solid #222;
-}
-
-.digit::after {
-  bottom: 0;
-  border-top: 1px solid #222;
-}
-
-.digit.flip::before {
-  animation: flipTop 0.3s ease-in-out forwards;
-}
-.digit.flip::after {
-  animation: flipBottom 0.3s ease-in-out 0.15s forwards;
-}
-
-@keyframes flipTop {
-  0% { transform: rotateX(0deg); }
-  100% { transform: rotateX(-90deg); }
-}
-@keyframes flipBottom {
-  0% { transform: rotateX(90deg); }
-  100% { transform: rotateX(0deg); }
-}
-
-/* Blinking */
-.blink {
-  animation: blink 1.5s infinite;
-}
-@keyframes blink {
-  0%,100%{opacity:1;color:#ffcc00;}
-  50%{opacity:0.3;color:#ffee77;}
-}
-
-/* Signature */
-.signature {
-  position: absolute;
-  bottom: 25px;
-  font-size: 0.9em;
-  color: #777;
-  letter-spacing: 1px;
-}
-.signature span {
-  color: #ffcc00;
-  text-shadow: 0 0 8px rgba(255, 230, 0, 0.4);
-}
-
-/* === FIX CLOCK DOUBLE LINE === */
-.clock-flip {
-  display: inline-flex;
-  flex-wrap: nowrap;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
-  overflow: hidden;
-  min-width: 18rem;        /* prevent wrapping */
+  gap: 0.25rem;
+  height: 3rem;
 }
 
-.clock-flip .digit,
-.clock-flip .colon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.digit, .colon {
   width: 2.2rem;
-  height: 2.8rem;
-  margin: 0 .08rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #111;
-  border-radius: .3rem;
-  font-family: "IBM Plex Mono", monospace;
+  border-radius: 0.3rem;
   font-size: 2rem;
   font-weight: 600;
   color: #ffd84b;
-  box-shadow: inset 0 -2px 0 #000, 0 0 10px #0007;
+  perspective: 300px;
+  overflow: hidden;
 }
 
-.clock-flip .colon {
+.colon {
   background: none;
-  box-shadow: none;
   width: 1rem;
 }
 
-.clock-flip .digit.flip {
-  animation: flap .6s ease both;
+.digit.flip::after {
+  content: attr(data-value);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: #111;
+  transform-origin: bottom;
+  animation: flip 0.3s ease forwards;
 }
 
-@keyframes flap {
-  0%   { transform: rotateX(0deg); }
-  49%  { transform: rotateX(-90deg); filter: brightness(.8); }
-  50%  { transform: rotateX(90deg);  filter: brightness(.8); }
-  100% { transform: rotateX(0deg);   filter: brightness(1); }
+@keyframes flip {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-90deg); filter: brightness(0.8); }
+}
+
+.signature {
+  font-size: 0.9rem;
+  color: #888;
+  margin-top: 0.5rem;
+}
+
+.signature span {
+  color: #ffd84b;
 }
