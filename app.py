@@ -52,23 +52,31 @@ async def update_area(area: dict):
     return {"status": "ok"}
 
 
+from fastapi.responses import HTMLResponse
+
 @app.get("/traffic")
 async def get_all_flights():
-    """Return all flights detected in current area."""
+    """Return all flights detected in current area (for backend use)."""
     try:
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
-
-        # format bounds string as expected by FlightRadar24API
         bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
 
         flights = fr.get_flights(bounds=bounds_str)
-
         inside = []
+
         for f in flights:
             try:
-                if f.longitude and f.latitude and polygon.contains(Point(f.longitude, f.latitude)):
+                # only outbound flights, ignore inbound and low altitude
+                if (
+                    f.longitude
+                    and f.latitude
+                    and polygon.contains(Point(f.longitude, f.latitude))
+                    and f.altitude > 400
+                    and f.heading is not None
+                    and (300 <= f.heading <= 360 or 0 <= f.heading <= 30)
+                ):
                     inside.append(
                         {
                             "id": f.id,
@@ -77,6 +85,7 @@ async def get_all_flights():
                             "destination": f.destination_airport_iata,
                             "lat": f.latitude,
                             "lng": f.longitude,
+                            "heading": f.heading,
                         }
                     )
             except Exception:
@@ -96,9 +105,7 @@ async def get_flight():
         area_data = load_area()
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
-
         bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
-
         flights = fr.get_flights(bounds=bounds_str)
 
         valid = []
@@ -110,7 +117,7 @@ async def get_flight():
                     and polygon.contains(Point(f.longitude, f.latitude))
                     and f.altitude > 400
                     and f.heading is not None
-                    and 300 <= f.heading <= 30  # northbound filter (wrap around 0)
+                    and (300 <= f.heading <= 360 or 0 <= f.heading <= 30)
                 ):
                     valid.append(f)
             except Exception:
@@ -145,7 +152,7 @@ async def get_flight():
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
 
-        print(f"✅ Flight {data['flight']} Dest:{data['destination']} Alt:{data['altitude']}")
+        print(f"✅ Outbound flight {data['flight']} to {data['destination']} at {data['altitude']} ft")
         return data
 
     except Exception as e:
@@ -154,6 +161,48 @@ async def get_flight():
             with open(LAST_FLIGHT_FILE, "r") as f:
                 return json.load(f)
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.get("/traffic-map", response_class=HTMLResponse)
+async def traffic_map():
+    """Visual debug map for area and live flights."""
+    area_data = load_area()
+    points = [(p["lat"], p["lng"]) for p in area_data["points"]]
+    polygon_js = json.dumps(points)
+    return f"""
+    <html>
+    <head>
+        <title>Traffic Map</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    </head>
+    <body style="margin:0">
+        <div id="map" style="height:100vh;width:100vw"></div>
+        <script>
+            const map = L.map('map').setView([{points[0][0]}, {points[0][1]}], 12);
+            L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+
+            const polygon = L.polygon({polygon_js}, {{color: 'cyan'}}).addTo(map);
+            map.fitBounds(polygon.getBounds());
+
+            async function updateFlights() {{
+                const res = await fetch('/traffic');
+                const data = await res.json();
+                if (data.flights) {{
+                    data.flights.forEach(f => {{
+                        L.circleMarker([f.lat, f.lng], {{
+                            radius: 6,
+                            color: 'yellow'
+                        }}).bindTooltip(`${{f.airline || '??'}} → ${{f.destination || '--'}}`).addTo(map);
+                    }});
+                }}
+            }}
+            updateFlights();
+            setInterval(updateFlights, 8000);
+        </script>
+    </body>
+    </html>
+    """
 
 
 @app.get("/health")
