@@ -31,13 +31,12 @@ async def home():
     </head>
     <body>
         <div class="flipboard">
-            <div class="header">✈ LIVE FLIGHT BOARD ✈</div>
+            <div class="header">
+                <span class="edit-button" onclick="window.location='/map'">✈</span>
+                LIVE FLIGHT BOARD
+            </div>
 
             <div class="flight-panel">
-                <div class="logo-frame">
-                    <img id="logo" src="/static/logos/default.png" alt="Logo">
-                </div>
-
                 <div class="info">
                     <div class="flip-row"><span class="label">Flight:</span><span id="flight" class="flip">--</span></div>
                     <div class="flip-row"><span class="label">Destination:</span><span id="destination" class="flip">--</span></div>
@@ -46,12 +45,13 @@ async def home():
                 </div>
 
                 <div class="clock-frame">
+                    <div class="logo-over-clock">
+                        <img id="logo" src="/static/logos/default.png" alt="Logo">
+                    </div>
                     <div class="clock-label">UTC</div>
                     <div id="utc-clock" class="clock-flip">--:--:--</div>
                 </div>
             </div>
-
-            <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
 
             <div class="signature">Designed by <span>TrippyDog ✈</span></div>
         </div>
@@ -77,7 +77,6 @@ async def home():
                     flipText(document.getElementById('altitude'), data.altitude || '--');
                     document.getElementById('logo').src = data.logo;
 
-                    // blinking if no traffic
                     if (data.flight && data.flight.includes("No traffic")) {
                         flightEl.classList.add("blink");
                     } else {
