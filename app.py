@@ -9,7 +9,6 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 fr = FlightRadar24API()
-
 AREA_FILE = "area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
@@ -33,7 +32,7 @@ async def home():
         <div class="flipboard">
             <div class="header">
                 <span class="edit-button" onclick="window.location='/map'">✈</span>
-                LIVE FLIGHT BOARD
+                LIVE FLIGHT BOARD ✈
             </div>
 
             <div class="flight-panel">
@@ -57,7 +56,7 @@ async def home():
         </div>
 
         <script>
-            // Flip animation for flight info
+            // Flight flip animation
             function flipText(el, newText) {
                 if (el.innerText === newText) return;
                 el.classList.remove('flip-anim');
@@ -66,49 +65,43 @@ async def home():
                 setTimeout(() => { el.innerText = newText; }, 250);
             }
 
-            // Fetch live flight info
             async function updateFlight() {
                 try {
                     const res = await fetch('/flight');
                     const data = await res.json();
-
                     const flightEl = document.getElementById('flight');
                     flipText(flightEl, data.flight || '--');
                     flipText(document.getElementById('destination'), data.destination || '--');
                     flipText(document.getElementById('aircraft'), data.aircraft || '--');
                     flipText(document.getElementById('altitude'), data.altitude || '--');
                     document.getElementById('logo').src = data.logo;
-
-                    if (data.flight && data.flight.includes("No traffic")) {
-                        flightEl.classList.add("blink");
-                    } else {
-                        flightEl.classList.remove("blink");
-                    }
                 } catch {
-                    console.warn('Update failed');
+                    console.warn('Flight update failed');
                 }
             }
 
-            // Split-flap clock setup
+            // Clock setup (split-flap digits)
             function createClockDigits() {
                 const container = document.getElementById("utc-clock");
-                container.innerHTML = "";
-                const digits = "00:00:00".split("");
-                digits.forEach(c => {
-                    const el = document.createElement("div");
-                    if (c === ":") {
-                        el.textContent = ":";
-                        el.style.width = "12px";
-                        el.style.background = "none";
-                        el.style.fontSize = "2.2em";
-                        el.style.color = "#ffcc00";
-                    } else {
-                        el.classList.add("digit");
-                        el.dataset.value = c;
-                        el.textContent = c;
-                    }
-                    container.appendChild(el);
-                });
+                if (!container.dataset.initialized) {
+                    container.dataset.initialized = "true";
+                    const digits = "00:00:00".split("");
+                    digits.forEach(c => {
+                        const el = document.createElement("div");
+                        if (c === ":") {
+                            el.textContent = ":";
+                            el.style.width = "12px";
+                            el.style.background = "none";
+                            el.style.fontSize = "2.2em";
+                            el.style.color = "#ffcc00";
+                        } else {
+                            el.classList.add("digit");
+                            el.dataset.value = c;
+                            el.textContent = c;
+                        }
+                        container.appendChild(el);
+                    });
+                }
             }
 
             function updateClock() {
@@ -129,10 +122,10 @@ async def home():
             }
 
             createClockDigits();
-            updateClock();
             setInterval(updateClock, 1000);
+            updateClock();
             updateFlight();
-            setInterval(updateFlight, 6000);
+            setInterval(updateFlight, 7000);
         </script>
     </body>
     </html>
@@ -239,7 +232,6 @@ async def get_flight():
         polygon = Polygon([(p["lng"], p["lat"]) for p in area_data["points"]])
         b = area_data["bounds"]
         bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
-
         flights = fr.get_flights(bounds=bounds_str)
         valid = []
 
@@ -249,7 +241,7 @@ async def get_flight():
                     f.longitude
                     and f.latitude
                     and polygon.contains(Point(f.longitude, f.latitude))
-                    and f.altitude > 2000
+                    and f.altitude > 1000
                     and f.heading is not None
                     and (f.heading >= 340 or f.heading <= 90)
                 ):
@@ -258,7 +250,6 @@ async def get_flight():
                 continue
 
         if not valid:
-            print("ℹ No northbound flights detected.")
             data = {
                 "flight": "No traffic northbound",
                 "destination": "--",
