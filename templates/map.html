@@ -2,46 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Define Area</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <style>
-    #map { height: 100vh; width: 100%; }
-    button {
-      position: absolute; top: 10px; right: 10px;
-      z-index: 1000; background-color: #ffc107; border: none;
-      padding: 10px 20px; cursor: pointer; font-weight: bold;
-    }
-  </style>
+  <title>Edit Flight Area</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 </head>
 <body>
+  <h1>✈ Edit Tracking Area</h1>
   <div id="map"></div>
   <button id="save">Save Area</button>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     const map = L.map("map").setView([4.7, -74.1], 11);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    const drawnItems = new L.FeatureGroup().addTo(map);
 
-    let polygon;
+    const drawControl = new L.Control.Draw({
+      edit: { featureGroup: drawnItems },
+      draw: { polygon: true, rectangle: true, circle: false, marker: false }
+    });
+    map.addControl(drawControl);
 
-    async function loadArea() {
-      const res = await fetch("/current-area");
-      const area = await res.json();
-      const pts = area.points.map(p => [p[0], p[1]]);
-      polygon = L.polygon(pts, {color: "cyan", weight: 2, fillOpacity: 0.2}).addTo(map);
-      polygon.editing = true;
-    }
+    let currentLayer = null;
 
-    loadArea();
+    map.on(L.Draw.Event.CREATED, function (e) {
+      if (currentLayer) drawnItems.removeLayer(currentLayer);
+      currentLayer = e.layer;
+      drawnItems.addLayer(currentLayer);
+    });
 
     document.getElementById("save").onclick = async () => {
-      const points = polygon.getLatLngs()[0].map(p => [p.lat, p.lng]);
+      if (!currentLayer) return alert("Draw an area first!");
+      const latlngs = currentLayer.getLatLngs()[0].map(p => ({ lat: p.lat, lng: p.lng }));
+      const bounds = currentLayer.getBounds();
+      const data = {
+        points: latlngs,
+        bounds: {
+          tl_y: bounds.getNorth(),
+          tl_x: bounds.getWest(),
+          br_y: bounds.getSouth(),
+          br_x: bounds.getEast(),
+        },
+      };
       await fetch("/update-area", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ points }),
+        body: JSON.stringify(data),
       });
-      alert("Area saved!");
+      alert("✅ Area saved!");
     };
   </script>
 </body>

@@ -4,36 +4,39 @@
   <meta charset="UTF-8" />
   <title>Live Flight Board</title>
   <link rel="stylesheet" href="/static/styles.css" />
-  <meta http-equiv="refresh" content="0.5">
 </head>
 <body>
+  <h1>✈ LIVE FLIGHT BOARD</h1>
   <div class="board">
-    <img id="logo" src="/static/logos/default.png" alt="Logo" class="logo" />
+    <img id="logo" src="/static/logos/default.png" alt="Logo" />
     <div class="info">
-      <div class="line"><span id="airline">Loading...</span></div>
-      <div class="line">Flight <span id="flight">--</span></div>
-      <div class="line">Destination <span id="destination">--</span></div>
-      <div class="line">Aircraft <span id="aircraft">--</span></div>
-      <div class="line">Altitude <span id="altitude">--</span> ft</div>
+      <p id="status">Loading...</p>
+      <p>Flight <span id="flight">--</span></p>
+      <p>Destination <span id="dest">--</span></p>
+      <p>Aircraft <span id="aircraft">--</span></p>
+      <p>Altitude <span id="alt">--</span> ft</p>
     </div>
   </div>
 
   <script>
-    async function fetchFlight() {
-      const res = await fetch("/flight/current");
-      const data = await res.json();
-
-      if (Object.keys(data).length === 0) return;
-
-      document.getElementById("airline").textContent = data.airline || "--";
-      document.getElementById("flight").textContent = data.flight || "--";
-      document.getElementById("destination").textContent = data.destination || "--";
-      document.getElementById("aircraft").textContent = data.aircraft || "--";
-      document.getElementById("altitude").textContent = data.altitude || "--";
-      document.getElementById("logo").src = data.logo || "/static/logos/default.png";
+    async function updateFlight() {
+      try {
+        const res = await fetch("/flight");
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        document.getElementById("status").textContent = "";
+        document.getElementById("flight").textContent = data.flight;
+        document.getElementById("dest").textContent = data.destination;
+        document.getElementById("aircraft").textContent = data.aircraft;
+        document.getElementById("alt").textContent = data.altitude;
+        document.getElementById("logo").src = data.logo || "/static/logos/default.png";
+      } catch (e) {
+        console.error("Error:", e);
+      }
     }
-    setInterval(fetchFlight, 500);
-    fetchFlight();
+
+    setInterval(updateFlight, 500); // twice per second
+    updateFlight();
   </script>
 </body>
 </html>

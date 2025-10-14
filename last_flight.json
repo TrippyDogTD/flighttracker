@@ -1,1 +1,7 @@
-{"airline": "AV", "flight_number": "AVA9532", "destination": "BAQ", "aircraft": "A320", "altitude": 8900, "logo": "data:image/svg+xml;base64,CiAgICAgICAgPHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCcgdmlld0JveD0nMCAwIDI0IDI0JyBmaWxsPScjRkZENzAwJz4KICAgICAgICA8cGF0aCBkPSdNMiAxNmwyMC04LTIwLTh2NmwxMiAyLTEyIDJ6Jy8+CiAgICAgICAgPC9zdmc+CiAgICAgICAg", "status": "live"}
+{
+  "flight": "--",
+  "destination": "--",
+  "aircraft": "--",
+  "altitude": 0,
+  "logo": "/static/logos/default.png"
+}
