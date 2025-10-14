@@ -22,11 +22,34 @@ def load_area():
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    return """
+    # Inline CSS patch for the clock layout so it never wraps (avoids the “double clock” look)
+    clock_css = """
+    <style>
+      .clock-flip { display:flex; gap:.35rem; align-items:center; white-space:nowrap; flex-wrap:nowrap; }
+      .clock-flip .digit, .clock-flip .colon {
+        display:inline-flex; width:2.1rem; height:2.8rem; justify-content:center; align-items:center;
+        font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size:2.0rem; color:#ffdd55; background:#111; border-radius:.35rem; box-shadow: inset 0 -2px 0 #000, 0 0 12px #0008;
+      }
+      .clock-flip .colon { width:1.1rem; background:transparent; box-shadow:none; font-weight:600; }
+      .clock-flip .digit.flip { animation: flap .6s ease both; }
+      @keyframes flap {
+        0% { transform: rotateX(0deg); filter:brightness(1); }
+        49% { transform: rotateX(-90deg); filter:brightness(.7); }
+        50% { transform: rotateX(90deg); filter:brightness(.7); }
+        100% { transform: rotateX(0deg); filter:brightness(1); }
+      }
+      /* keep the whole right column roomy so digits don’t wrap */
+      .clock-frame { min-width: 22rem; }
+    </style>
+    """
+
+    return f"""
     <html>
     <head>
         <title>Live Flight Board ✈✈</title>
         <link rel="stylesheet" href="/static/styles.css">
+        {clock_css}
     </head>
     <body>
         <div class="flipboard">
@@ -56,68 +79,79 @@ async def home():
         </div>
 
         <script>
-            // Animate flip text
-            function flipText(el, newText) {
+            // ======= Flip helpers =======
+            function flipText(el, newText) {{
                 if (el.innerText === newText) return;
                 el.classList.remove('flip-anim');
-                void el.offsetWidth;
+                void el.offsetWidth; // reflow
                 el.classList.add('flip-anim');
-                setTimeout(() => { el.innerText = newText; }, 250);
-            }
+                setTimeout(() => {{ el.innerText = newText; }}, 250);
+            }}
 
-            async function updateFlight() {
-                try {
+            async function updateFlight() {{
+                try {{
                     const res = await fetch('/flight');
                     const data = await res.json();
                     flipText(document.getElementById('flight'), data.flight || '--');
                     flipText(document.getElementById('destination'), data.destination || '--');
                     flipText(document.getElementById('aircraft'), data.aircraft || '--');
                     flipText(document.getElementById('altitude'), data.altitude || '--');
-                    document.getElementById('logo').src = data.logo;
-                } catch {
-                    console.warn('Flight update failed');
-                }
-            }
+                    document.getElementById('logo').src = data.logo || '/static/logos/default.png';
+                }} catch (e) {{
+                    console.warn('Flight update failed', e);
+                }}
+            }}
 
-            // Split-flap clock (single instance)
-            function initClock() {
-                const container = document.getElementById("utc-clock");
-                if (container.dataset.ready) return;
-                container.dataset.ready = "true";
-                const template = "00:00:00".split("");
-                for (const ch of template) {
-                    const el = document.createElement("div");
-                    if (ch === ":") {
-                        el.textContent = ":";
-                        el.classList.add("colon");
-                    } else {
-                        el.classList.add("digit");
-                        el.dataset.value = ch;
-                        el.textContent = ch;
-                    }
-                    container.appendChild(el);
-                }
-            }
+            // ======= Single-instance split-flap clock =======
+            function initClock() {{
+                const c = document.getElementById('utc-clock');
+                if (c.dataset.ready) return;      // prevent duplicates
+                c.dataset.ready = 'true';
+                c.innerHTML = '';                 // clear just in case
 
-            function updateClock() {
+                // Make 6 digits with 2 colons between groups
+                function addDigit() {{
+                    const d = document.createElement('div');
+                    d.className = 'digit';
+                    d.dataset.value = '0';
+                    d.textContent = '0';
+                    c.appendChild(d);
+                }}
+                function addColon() {{
+                    const col = document.createElement('div');
+                    col.className = 'colon';
+                    col.textContent = ':';
+                    c.appendChild(col);
+                }}
+
+                addDigit(); addDigit(); addColon(); addDigit(); addDigit(); addColon(); addDigit(); addDigit();
+            }}
+
+            function updateClock() {{
                 const now = new Date();
-                const utcTime = now.toISOString().slice(11, 19).split("");
-                const digits = document.querySelectorAll("#utc-clock .digit");
-                digits.forEach((d, i) => {
-                    const newVal = utcTime[i];
-                    if (!newVal || newVal === ":") return;
-                    if (d.dataset.value !== newVal) {
-                        d.classList.add("flip");
-                        setTimeout(() => d.classList.remove("flip"), 600);
-                        d.dataset.value = newVal;
-                        d.textContent = newVal;
-                    }
-                });
-            }
+                // "HH:MM:SS"
+                const t = now.toISOString().slice(11, 19);
+                // Keep only the 6 numeric digits for mapping
+                const digitsArray = t.replaceAll(':','').split(''); // length 6
+                const els = Array.from(document.querySelectorAll('#utc-clock .digit')); // length 6
 
+                for (let i = 0; i < 6; i++) {{
+                    const el = els[i];
+                    const next = digitsArray[i];
+                    if (el.dataset.value !== next) {{
+                        el.classList.add('flip');
+                        setTimeout(() => el.classList.remove('flip'), 600);
+                        el.dataset.value = next;
+                        el.textContent = next;
+                    }}
+                }}
+            }}
+
+            // Boot
             initClock();
             updateClock();
             setInterval(updateClock, 1000);
+
             updateFlight();
             setInterval(updateFlight, 7000);
         </script>
@@ -161,9 +195,10 @@ async def map_editor():
                 map.fitBounds(currentPolygon.getBounds());
             }}
 
+            const fg = currentPolygon ? L.featureGroup([currentPolygon]) : L.featureGroup();
             const drawControl = new L.Control.Draw({{
                 draw: {{ polygon:true, polyline:false, circle:false, rectangle:false, marker:false }},
-                edit: {{ featureGroup: currentPolygon ? L.featureGroup([currentPolygon]) : L.featureGroup() }}
+                edit: {{ featureGroup: fg }}
             }});
             map.addControl(drawControl);
 
@@ -232,12 +267,11 @@ async def get_flight():
         for f in flights:
             try:
                 if (
-                    f.longitude
-                    and f.latitude
+                    f.longitude is not None and f.latitude is not None
                     and polygon.contains(Point(f.longitude, f.latitude))
-                    and f.altitude > 1000
+                    and (f.altitude or 0) >= 1000
                     and f.heading is not None
-                    and (f.heading >= 340 or f.heading <= 90)
+                    and (f.heading >= 340 or f.heading <= 90)   # northbound sector
                 ):
                     valid.append(f)
             except Exception:
@@ -256,15 +290,15 @@ async def get_flight():
             return data
 
         chosen = random.choice(valid)
-        airline_code = chosen.airline_iata or "default"
+        airline_code = (chosen.airline_iata or "").strip() or "default"
         logo_path = f"static/logos/{airline_code}.png"
         logo_url = f"/static/logos/{airline_code}.png" if os.path.exists(logo_path) else "/static/logos/default.png"
 
         data = {
-            "flight": chosen.callsign or chosen.id or "--",
-            "destination": chosen.destination_airport_iata or "--",
-            "aircraft": chosen.aircraft_code or "--",
-            "altitude": f"{int(chosen.altitude)} ft",
+            "flight": (chosen.callsign or chosen.id or "--"),
+            "destination": (chosen.destination_airport_iata or "--"),
+            "aircraft": (chosen.aircraft_code or "--"),
+            "altitude": f"{int(chosen.altitude)} ft" if chosen.altitude is not None else "--",
             "logo": logo_url,
         }
 
