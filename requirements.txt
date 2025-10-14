@@ -1,18 +1,7 @@
-# Web framework
 fastapi==0.115.2
 uvicorn[standard]==0.31.0
-
-# Template engine
 jinja2==3.1.4
-
-# Flight data API
 flightradarapi==1.4.0
-
-# Geometry and geospatial utilities
 shapely==2.0.6
-
-# HTTP utilities
 requests==2.32.3
-
-# Optional — useful during development
 python-multipart==0.0.9

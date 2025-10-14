@@ -1,118 +1,126 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from jinja2 import Environment, FileSystemLoader
+from fastapi.templating import Jinja2Templates
 from flightradarapi import FlightRadar24API
 from shapely.geometry import Point, Polygon
-import base64
 import requests
-import io
+import math
+import os
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
 fr_api = FlightRadar24API()
 
-# Static + templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-env = Environment(loader=FileSystemLoader("templates"))
+# Default cyan area (Bogotá)
+AREA = {
+    "points": [
+        [4.665, -74.160],
+        [4.665, -74.050],
+        [4.775, -74.050],
+        [4.775, -74.160],
+    ]
+}
 
-# Your default polygon (cyan area)
-polygon_coords = [
-    (-74.1500, 4.6700),
-    (-74.0500, 4.6700),
-    (-74.0500, 4.7500),
-    (-74.1500, 4.7500),
-]
-area_polygon = Polygon(polygon_coords)
-
-last_flight_data = None  # Keep last departing aircraft data
-
-def get_airline_logo(airline):
-    """Fetch and return airline logo as Base64 URI"""
-    try:
-        logo_url = airline.get("logo") or airline.get("image")
-        if not logo_url:
-            return None
-
-        if isinstance(logo_url, bytes):
-            # Convert binary to base64 string
-            encoded = base64.b64encode(logo_url).decode("utf-8")
-            return f"data:image/png;base64,{encoded}"
-
-        if isinstance(logo_url, str) and logo_url.startswith("http"):
-            # Fetch the image and convert to base64 to make sure it always renders
-            response = requests.get(logo_url, timeout=5)
-            if response.status_code == 200:
-                encoded = base64.b64encode(response.content).decode("utf-8")
-                return f"data:image/png;base64,{encoded}"
-        return None
-    except Exception:
-        return None
+last_flight_data = None  # store last departing flight
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    template = env.get_template("index.html")
-    return template.render()
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_page(request: Request):
-    template = env.get_template("map.html")
-    return template.render()
+    return templates.TemplateResponse("map.html", {"request": request, "area": AREA})
 
 
 @app.get("/current-area")
-async def get_current_area():
-    """Returns current polygon coordinates."""
-    return {"coords": list(area_polygon.exterior.coords)}
+async def current_area():
+    return AREA
 
 
-@app.post("/current-area")
+@app.post("/update-area")
 async def update_area(request: Request):
-    """Update the polygon area via the map editor."""
-    global area_polygon
+    global AREA
     data = await request.json()
-    coords = data.get("coords", [])
-    if coords:
-        area_polygon = Polygon(coords)
-    return {"message": "Area updated successfully", "coords": coords}
+    AREA = data
+    return {"status": "Area updated"}
 
 
 @app.get("/flight/current")
-async def get_current_flight():
-    """Fetch latest outbound flight heading north within the area."""
+async def current_flight():
+    """
+    Fetch flights in area, filter for those departing and heading northbound,
+    above 400 ft AGL.
+    """
     global last_flight_data
+
+    bounds = _get_bounds_from_area(AREA)
+    flights = fr_api.get_flights(bounds=bounds)
+
+    selected = None
+    for f in flights:
+        if not f.latitude or not f.longitude:
+            continue
+        # altitude filter
+        if f.altitude is None or f.altitude < 400:
+            continue
+
+        # heading north (roughly between 300°–60°)
+        heading = getattr(f, "heading", 0)
+        if heading is None or not (300 <= heading or heading <= 60):
+            continue
+
+        point = Point(f.latitude, f.longitude)
+        poly = Polygon(AREA["points"])
+        if poly.contains(point):
+            selected = f
+            break
+
+    if selected:
+        last_flight_data = _build_flight_info(selected)
+        return last_flight_data
+
+    # return last known flight if no active one
+    return last_flight_data or {}
+
+
+def _get_bounds_from_area(area):
+    lats = [p[0] for p in area["points"]]
+    lons = [p[1] for p in area["points"]]
+    return {
+        "fa": min(lats),
+        "fo": min(lons),
+        "la": max(lats),
+        "lo": max(lons),
+    }
+
+
+def _build_flight_info(f):
+    airline = f.airline_name or "Unknown"
+    logo_url = _get_airline_logo(f.airline_icao or "")
+
+    return {
+        "flight": f.number or "N/A",
+        "destination": f.destination_airport_name or "Unknown",
+        "aircraft": f.aircraft_code or "N/A",
+        "altitude": f.altitude,
+        "airline": airline,
+        "logo": logo_url,
+    }
+
+
+def _get_airline_logo(icao):
+    if not icao:
+        return "/static/logos/default.png"
+    url = f"https://content.airhex.com/content/logos/airlines_{icao}_200_200_s.png?proportions=keep"
     try:
-        flights = fr_api.get_flights(bounds=fr_api.get_bounds_by_point(4.70, -74.10))
-        for f in flights:
-            lat, lon = f.latitude, f.longitude
-            if lat is None or lon is None:
-                continue
-
-            point = Point(lon, lat)
-            # Only keep outbound (northbound-ish) flights above 400ft
-            if area_polygon.contains(point) and f.altitude > 400 and 0 <= f.track <= 30:
-                details = fr_api.get_flight_details(f)
-                airline_logo = get_airline_logo(details.get("airline", {}))
-                flight_data = {
-                    "flight": details.get("identification", {}).get("callsign", "Unknown"),
-                    "destination": details.get("airport", {}).get("destination", {}).get("name", "Unknown"),
-                    "aircraft": details.get("aircraft", {}).get("model", "Unknown"),
-                    "altitude": f.altitude,
-                    "logo": airline_logo,
-                }
-                last_flight_data = flight_data
-                return JSONResponse(flight_data)
-
-        # If no active aircraft → keep showing the last one
-        if last_flight_data:
-            return JSONResponse(last_flight_data)
-        return JSONResponse({"message": "No outbound flights currently in area."})
-
-    except Exception as e:
-        return JSONResponse({"error": str(e)})
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+        response = requests.head(url, timeout=2)
+        if response.status_code == 200:
+            return url
+    except:
+        pass
+    return "/static/logos/default.png"

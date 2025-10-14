@@ -1,113 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Flight Board</title>
-<style>
-  body {
-    background: #f4e3b2; /* warm yellow tone */
-    color: #222;
-    font-family: "Courier New", monospace;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-  }
-
-  .flight-board {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    background: #fff5cc;
-    border: 3px solid #d2b048;
-    padding: 25px 40px;
-    border-radius: 12px;
-    box-shadow: 0 0 20px rgba(210,176,72,0.3);
-    min-width: 600px;
-  }
-
-  .flight-logo {
-    width: 90px;
-    height: 90px;
-    object-fit: contain;
-    border-radius: 6px;
-    background: #fffdf5;
-    border: 1px solid #e0c96c;
-  }
-
-  .flight-info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .label {
-    color: #555;
-    font-size: 0.9rem;
-  }
-
-  .value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #222;
-    animation: flip 0.4s ease-in-out;
-  }
-
-  @keyframes flip {
-    0% { transform: rotateX(90deg); opacity: 0; }
-    100% { transform: rotateX(0deg); opacity: 1; }
-  }
-
-  .title-bar {
-    position: absolute;
-    top: 10px;
-    left: 20px;
-    font-size: 1rem;
-    color: #444;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Live Flight Board</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <meta http-equiv="refresh" content="0.5">
 </head>
 <body>
-  <div class="title-bar">✈️ Live Northbound Flights - Bogotá Area</div>
-  <div class="flight-board">
-    <img id="airline-logo" class="flight-logo" src="" alt="Logo">
-    <div class="flight-info">
-      <div><span class="label">FLIGHT:</span> <span id="flight" class="value">Loading...</span></div>
-      <div><span class="label">DESTINATION:</span> <span id="destination" class="value">Loading...</span></div>
-      <div><span class="label">AIRCRAFT:</span> <span id="aircraft" class="value">Loading...</span></div>
-      <div><span class="label">ALTITUDE:</span> <span id="altitude" class="value">Loading...</span></div>
+  <div class="board">
+    <img id="logo" src="/static/logos/default.png" alt="Logo" class="logo" />
+    <div class="info">
+      <div class="line"><span id="airline">Loading...</span></div>
+      <div class="line">Flight <span id="flight">--</span></div>
+      <div class="line">Destination <span id="destination">--</span></div>
+      <div class="line">Aircraft <span id="aircraft">--</span></div>
+      <div class="line">Altitude <span id="altitude">--</span> ft</div>
     </div>
   </div>
 
-<script>
-async function fetchFlight() {
-  try {
-    const res = await fetch("/flight/current");
-    const data = await res.json();
+  <script>
+    async function fetchFlight() {
+      const res = await fetch("/flight/current");
+      const data = await res.json();
 
-    if (data.error || data.message) return;
-    document.getElementById("flight").textContent = data.flight || "Unknown";
-    document.getElementById("destination").textContent = data.destination || "Unknown";
-    document.getElementById("aircraft").textContent = data.aircraft || "Unknown";
-    document.getElementById("altitude").textContent = data.altitude ? data.altitude + " ft" : "Unknown";
+      if (Object.keys(data).length === 0) return;
 
-    const logo = document.getElementById("airline-logo");
-    if (data.logo) {
-      logo.src = data.logo;
-      logo.style.display = "block";
-    } else {
-      logo.style.display = "none";
+      document.getElementById("airline").textContent = data.airline || "--";
+      document.getElementById("flight").textContent = data.flight || "--";
+      document.getElementById("destination").textContent = data.destination || "--";
+      document.getElementById("aircraft").textContent = data.aircraft || "--";
+      document.getElementById("altitude").textContent = data.altitude || "--";
+      document.getElementById("logo").src = data.logo || "/static/logos/default.png";
     }
-  } catch (err) {
-    console.error("Error fetching flight:", err);
-  }
-}
-
-// refresh twice per second
-setInterval(fetchFlight, 500);
-fetchFlight();
-</script>
+    setInterval(fetchFlight, 500);
+    fetchFlight();
+  </script>
 </body>
 </html>

@@ -1,83 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Edit Cyan Area</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<style>
-  html, body { height: 100%; margin: 0; }
-  #map { height: 100%; }
-  .leaflet-bar a {
-    background: #f4e3b2 !important;
-    color: #333 !important;
-  }
-  .save-btn {
-    position: absolute;
-    top: 10px;
-    right: 20px;
-    z-index: 1000;
-    background: #d2b048;
-    color: #222;
-    padding: 10px 15px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-    border: none;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Define Area</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; width: 100%; }
+    button {
+      position: absolute; top: 10px; right: 10px;
+      z-index: 1000; background-color: #ffc107; border: none;
+      padding: 10px 20px; cursor: pointer; font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-<button class="save-btn" onclick="saveArea()">💾 Save Area</button>
-<div id="map"></div>
+  <div id="map"></div>
+  <button id="save">Save Area</button>
 
-<script>
-let map = L.map('map').setView([4.7, -74.1], 11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-}).addTo(map);
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map").setView([4.7, -74.1], 11);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-let editableLayer = new L.FeatureGroup().addTo(map);
-let drawControl = new L.Control.Draw({
-  edit: { featureGroup: editableLayer },
-  draw: { polygon: true, polyline: false, circle: false, rectangle: false, marker: false, circlemarker: false }
-});
-map.addControl(drawControl);
+    let polygon;
 
-let currentPolygon = null;
+    async function loadArea() {
+      const res = await fetch("/current-area");
+      const area = await res.json();
+      const pts = area.points.map(p => [p[0], p[1]]);
+      polygon = L.polygon(pts, {color: "cyan", weight: 2, fillOpacity: 0.2}).addTo(map);
+      polygon.editing = true;
+    }
 
-// Load current polygon
-fetch("/current-area")
-  .then(res => res.json())
-  .then(data => {
-    const coords = data.coords.map(([lon, lat]) => [lat, lon]);
-    currentPolygon = L.polygon(coords, { color: "cyan" }).addTo(editableLayer);
-    map.fitBounds(currentPolygon.getBounds());
-  });
+    loadArea();
 
-map.on(L.Draw.Event.CREATED, function (e) {
-  editableLayer.clearLayers();
-  currentPolygon = e.layer;
-  editableLayer.addLayer(currentPolygon);
-});
-
-async function saveArea() {
-  if (!currentPolygon) {
-    alert("Draw a polygon first!");
-    return;
-  }
-  const coords = currentPolygon.getLatLngs()[0].map(p => [p.lng, p.lat]);
-  const res = await fetch("/current-area", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ coords })
-  });
-  const data = await res.json();
-  alert("✅ Area saved!");
-}
-</script>
+    document.getElementById("save").onclick = async () => {
+      const points = polygon.getLatLngs()[0].map(p => [p.lat, p.lng]);
+      await fetch("/update-area", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points }),
+      });
+      alert("Area saved!");
+    };
+  </script>
 </body>
 </html>

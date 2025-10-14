@@ -1,0 +1,31 @@
+body {
+  margin: 0;
+  background: #fef3c7;
+  font-family: "Courier New", monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.board {
+  display: flex;
+  align-items: center;
+  background: #222;
+  color: #ffc107;
+  padding: 40px;
+  border-radius: 10px;
+  box-shadow: 0 0 25px rgba(0,0,0,0.4);
+}
+
+.logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-right: 30px;
+}
+
+.line {
+  font-size: 1.5em;
+  margin: 5px 0;
+}
