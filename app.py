@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
-from FlightRadarAPI import FlightRadar24API
+from flightradarapi import FlightRadar24API
 from shapely.geometry import Point, Polygon
 import base64
 import requests
