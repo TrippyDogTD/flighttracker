@@ -31,7 +31,11 @@ async def home():
     </head>
     <body>
         <div class="flipboard">
-            <div class="header">✈ LIVE FLIGHT BOARD ✈</div>
+            <div class="header">
+                ✈ LIVE FLIGHT BOARD ✈
+                <div class="clock" id="utc-clock">--:--:--Z</div>
+            </div>
+
             <div class="flight-panel">
                 <div class="logo-frame">
                     <img id="logo" src="/static/logos/default.png" alt="Logo">
@@ -41,9 +45,10 @@ async def home():
                     <div class="flip-row"><span class="label">Flight:</span><span id="flight" class="flip">--</span></div>
                     <div class="flip-row"><span class="label">Destination:</span><span id="destination" class="flip">--</span></div>
                     <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft" class="flip">--</span></div>
-                    <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">0 ft</span></div>
+                    <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">--</span></div>
                 </div>
             </div>
+
             <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
         </div>
 
@@ -60,16 +65,34 @@ async def home():
                 try {
                     const res = await fetch('/flight');
                     const data = await res.json();
-                    flipText(document.getElementById('flight'), data.flight || '--');
+
+                    const flightEl = document.getElementById('flight');
+                    flipText(flightEl, data.flight || '--');
                     flipText(document.getElementById('destination'), data.destination || '--');
                     flipText(document.getElementById('aircraft'), data.aircraft || '--');
-                    flipText(document.getElementById('altitude'), (data.altitude || 0) + ' ft');
+                    flipText(document.getElementById('altitude'), data.altitude || '--');
                     document.getElementById('logo').src = data.logo;
+
+                    // blinking effect if "No traffic northbound"
+                    if (data.flight && data.flight.includes("No traffic")) {
+                        flightEl.classList.add("blink");
+                    } else {
+                        flightEl.classList.remove("blink");
+                    }
+
                 } catch {
                     console.warn('Update failed');
                 }
             }
 
+            function updateClock() {
+                const now = new Date();
+                const utc = now.toISOString().slice(11, 19) + "Z";
+                document.getElementById("utc-clock").innerText = utc;
+            }
+
+            updateClock();
+            setInterval(updateClock, 1000);
             updateFlight();
             setInterval(updateFlight, 6000);
         </script>
@@ -197,20 +220,20 @@ async def get_flight():
                 continue
 
         if not valid:
-            if os.path.exists(LAST_FLIGHT_FILE):
-                with open(LAST_FLIGHT_FILE, "r") as f:
-                    return json.load(f)
-            return {
-                "flight": "--",
+            print("ℹ No northbound flights detected.")
+            data = {
+                "flight": "No traffic northbound",
                 "destination": "--",
                 "aircraft": "--",
-                "altitude": 0,
-                "logo": "/static/logos/default.png",
+                "altitude": "--",
+                "logo": "/static/logos/SS.png" if os.path.exists("static/logos/SS.png") else "/static/logos/default.png",
             }
+            with open(LAST_FLIGHT_FILE, "w") as f:
+                json.dump(data, f)
+            return data
 
         chosen = random.choice(valid)
         airline_code = chosen.airline_iata or "default"
-
         logo_path = f"static/logos/{airline_code}.png"
         logo_url = f"/static/logos/{airline_code}.png" if os.path.exists(logo_path) else "/static/logos/default.png"
 
@@ -218,13 +241,14 @@ async def get_flight():
             "flight": chosen.callsign or chosen.id or "--",
             "destination": chosen.destination_airport_iata or "--",
             "aircraft": chosen.aircraft_code or "--",
-            "altitude": int(chosen.altitude),
+            "altitude": f"{int(chosen.altitude)} ft",
             "logo": logo_url,
         }
 
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
 
+        print(f"✅ {data['flight']} → {data['destination']} ({data['aircraft']}) {data['altitude']}")
         return data
 
     except Exception as e:
