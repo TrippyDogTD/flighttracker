@@ -31,10 +31,7 @@ async def home():
     </head>
     <body>
         <div class="flipboard">
-            <div class="header">
-                ✈ LIVE FLIGHT BOARD ✈
-                <div class="clock" id="utc-clock">--:--:--Z</div>
-            </div>
+            <div class="header">✈ LIVE FLIGHT BOARD ✈</div>
 
             <div class="flight-panel">
                 <div class="logo-frame">
@@ -47,9 +44,16 @@ async def home():
                     <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft" class="flip">--</span></div>
                     <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">--</span></div>
                 </div>
+
+                <div class="clock-frame">
+                    <div class="clock-label">UTC</div>
+                    <div id="utc-clock" class="clock-flip">--:--:--</div>
+                </div>
             </div>
 
             <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
+
+            <div class="signature">Designed by <span>TrippyDog ✈</span></div>
         </div>
 
         <script>
@@ -73,13 +77,12 @@ async def home():
                     flipText(document.getElementById('altitude'), data.altitude || '--');
                     document.getElementById('logo').src = data.logo;
 
-                    // blinking effect if "No traffic northbound"
+                    // blinking if no traffic
                     if (data.flight && data.flight.includes("No traffic")) {
                         flightEl.classList.add("blink");
                     } else {
                         flightEl.classList.remove("blink");
                     }
-
                 } catch {
                     console.warn('Update failed');
                 }
@@ -87,8 +90,8 @@ async def home():
 
             function updateClock() {
                 const now = new Date();
-                const utc = now.toISOString().slice(11, 19) + "Z";
-                document.getElementById("utc-clock").innerText = utc;
+                const utc = now.toISOString().slice(11, 19);
+                flipText(document.getElementById("utc-clock"), utc);
             }
 
             updateClock();
