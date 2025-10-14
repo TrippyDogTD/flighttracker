@@ -49,7 +49,7 @@ async def home():
                         <img id="logo" src="/static/logos/default.png" alt="Logo">
                     </div>
                     <div class="clock-label">UTC</div>
-                    <div id="utc-clock" class="clock-flip">--:--:--</div>
+                    <div id="utc-clock" class="clock-flip"></div>
                 </div>
             </div>
 
@@ -57,6 +57,7 @@ async def home():
         </div>
 
         <script>
+            // Flip animation for flight info
             function flipText(el, newText) {
                 if (el.innerText === newText) return;
                 el.classList.remove('flip-anim');
@@ -65,6 +66,7 @@ async def home():
                 setTimeout(() => { el.innerText = newText; }, 250);
             }
 
+            // Fetch live flight info
             async function updateFlight() {
                 try {
                     const res = await fetch('/flight');
@@ -87,12 +89,46 @@ async def home():
                 }
             }
 
+            // Split-flap clock setup
+            function createClockDigits() {
+                const container = document.getElementById("utc-clock");
+                container.innerHTML = "";
+                const digits = "00:00:00".split("");
+                digits.forEach(c => {
+                    const el = document.createElement("div");
+                    if (c === ":") {
+                        el.textContent = ":";
+                        el.style.width = "12px";
+                        el.style.background = "none";
+                        el.style.fontSize = "2.2em";
+                        el.style.color = "#ffcc00";
+                    } else {
+                        el.classList.add("digit");
+                        el.dataset.value = c;
+                        el.textContent = c;
+                    }
+                    container.appendChild(el);
+                });
+            }
+
             function updateClock() {
                 const now = new Date();
                 const utc = now.toISOString().slice(11, 19);
-                flipText(document.getElementById("utc-clock"), utc);
+                const chars = utc.split("");
+                const digits = document.querySelectorAll("#utc-clock .digit");
+                digits.forEach((d, i) => {
+                    const newVal = chars[i];
+                    if (!newVal || newVal === ":") return;
+                    if (d.dataset.value !== newVal) {
+                        d.classList.add("flip");
+                        setTimeout(() => d.classList.remove("flip"), 600);
+                        d.dataset.value = newVal;
+                        d.textContent = newVal;
+                    }
+                });
             }
 
+            createClockDigits();
             updateClock();
             setInterval(updateClock, 1000);
             updateFlight();
