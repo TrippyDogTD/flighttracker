@@ -36,26 +36,42 @@ async def home():
     </head>
     <body>
         <h1>✈ LIVE FLIGHT BOARD</h1>
+
         <div class="board">
-            <img id="logo" src="/static/logos/default.png" alt="Logo">
-            <div>
-                <p id="flight">Flight --</p>
-                <p id="destination">Destination --</p>
-                <p id="aircraft">Aircraft --</p>
-                <p id="altitude">Altitude 0 ft</p>
+            <div class="logo-frame">
+                <img id="logo" src="/static/logos/default.png" alt="Logo">
+            </div>
+            <div class="info">
+                <div class="flip-row"><span class="label">Flight:</span><span id="flight" class="flip">--</span></div>
+                <div class="flip-row"><span class="label">Destination:</span><span id="destination" class="flip">--</span></div>
+                <div class="flip-row"><span class="label">Aircraft:</span><span id="aircraft" class="flip">--</span></div>
+                <div class="flip-row"><span class="label">Altitude:</span><span id="altitude" class="flip">0 ft</span></div>
             </div>
         </div>
+
         <button onclick="window.location='/map'">✏ Edit Tracking Area</button>
 
         <script>
+            function flipText(el, newText) {
+                if (el.innerText === newText) return;
+                el.classList.remove('flip-anim');
+                void el.offsetWidth; // restart animation
+                el.classList.add('flip-anim');
+                setTimeout(() => { el.innerText = newText; }, 250);
+            }
+
             async function updateFlight() {
-                const res = await fetch('/flight');
-                const data = await res.json();
-                document.getElementById('flight').innerText = 'Flight ' + (data.flight || '--');
-                document.getElementById('destination').innerText = 'Destination ' + (data.destination || '--');
-                document.getElementById('aircraft').innerText = 'Aircraft ' + (data.aircraft || '--');
-                document.getElementById('altitude').innerText = 'Altitude ' + (data.altitude || 0) + ' ft';
-                document.getElementById('logo').src = data.logo;
+                try {
+                    const res = await fetch('/flight');
+                    const data = await res.json();
+                    flipText(document.getElementById('flight'), data.flight || '--');
+                    flipText(document.getElementById('destination'), data.destination || '--');
+                    flipText(document.getElementById('aircraft'), data.aircraft || '--');
+                    flipText(document.getElementById('altitude'), (data.altitude || 0) + ' ft');
+                    document.getElementById('logo').src = data.logo;
+                } catch {
+                    console.warn('Update failed');
+                }
             }
             updateFlight();
             setInterval(updateFlight, 8000);

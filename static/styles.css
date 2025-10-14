@@ -1,6 +1,6 @@
 body {
     font-family: 'Courier New', monospace;
-    background-color: #f7e59b;
+    background-color: #f6e490;
     color: #ffcc00;
     text-align: center;
     padding-top: 40px;
@@ -8,44 +8,96 @@ body {
 
 h1 {
     font-size: 2.4em;
-    text-shadow: 2px 2px 6px #000;
+    text-shadow: 2px 2px 8px #000;
+    letter-spacing: 2px;
 }
 
 .board {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background-color: #1c1c1c;
-    padding: 30px 50px;
-    border-radius: 14px;
-    box-shadow: 0px 0px 25px rgba(0, 0, 0, 0.4);
+    background-color: #141414;
+    padding: 30px 60px;
+    border-radius: 18px;
+    box-shadow: 0px 0px 30px rgba(0, 0, 0, 0.5);
+    margin-top: 20px;
 }
 
-.board img {
-    width: 70px;
-    margin-right: 25px;
-    border-radius: 8px;
+.logo-frame {
+    background: radial-gradient(circle at center, #222 0%, #000 100%);
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: inset 0 0 10px rgba(255, 255, 0, 0.3), 0 0 15px rgba(0, 0, 0, 0.7);
+    margin-right: 30px;
 }
 
-p {
+.logo-frame img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    filter: brightness(1.1);
+}
+
+.info {
+    text-align: left;
+}
+
+.label {
+    color: #ffdd55;
+    margin-right: 10px;
+    font-weight: bold;
+    text-shadow: 0 0 6px rgba(255, 255, 0, 0.3);
+}
+
+.flip-row {
     font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #111;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin: 6px 0;
+    box-shadow: inset 0 -2px 0 #222, inset 0 2px 0 #000;
+}
+
+.flip {
+    background-color: #222;
     color: #ffcc00;
-    margin: 5px 0;
+    padding: 3px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    min-width: 100px;
+    text-align: left;
+    font-weight: bold;
+    transition: all 0.25s;
+}
+
+/* Flipboard animation */
+.flip-anim {
+    animation: flipAnim 0.4s ease-in-out;
+}
+
+@keyframes flipAnim {
+    0% { transform: rotateX(0deg); }
+    50% { transform: rotateX(90deg); opacity: 0.5; }
+    100% { transform: rotateX(0deg); opacity: 1; }
 }
 
 button {
-    margin-top: 25px;
-    padding: 12px 25px;
+    margin-top: 30px;
+    padding: 14px 28px;
     border: none;
     border-radius: 10px;
     background-color: #ffcc00;
-    color: #1c1c1c;
+    color: #1a1a1a;
     font-weight: bold;
     cursor: pointer;
     font-size: 1em;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     transition: transform 0.2s;
 }
+
 button:hover {
     transform: scale(1.05);
 }
