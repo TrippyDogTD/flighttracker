@@ -97,6 +97,107 @@ async def map_editor():
     with open("static/map.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
+@app.get("/console", response_class=HTMLResponse)
+async def console_page():
+    # Load all saved areas
+    areas = load_areas()
+    # Filter only North & South departures
+    preset_areas = [a for a in areas if a["name"] in ["North Departures", "South Departures"]]
+
+    # If none exist, load defaults
+    if not preset_areas:
+        preset_areas = DEFAULT_AREAS
+
+    # Build editable JSON string
+    json_text = json.dumps(preset_areas, indent=2)
+
+    return f"""
+    <html>
+    <head>
+        <title>Console | FlightTracker</title>
+        <link rel="stylesheet" href="/static/styles.css" />
+        <style>
+            body {{
+                background:#000;
+                color:#ffd84b;
+                font-family:'IBM Plex Mono', monospace;
+                padding:20px;
+            }}
+            h1 {{
+                font-size:1.4rem;
+                margin-bottom:10px;
+                text-shadow:0 0 10px #ffda00;
+            }}
+            textarea {{
+                width:100%;
+                height:70vh;
+                background:#111;
+                color:#ffd84b;
+                border:1px solid #ffda0040;
+                border-radius:8px;
+                padding:10px;
+                font-family:'IBM Plex Mono', monospace;
+                font-size:0.9rem;
+                resize:none;
+                box-shadow:inset 0 0 10px #000;
+            }}
+            .btns {{
+                margin-top:15px;
+            }}
+            button {{
+                background:#111;
+                color:#ffd84b;
+                border:1px solid #ffda0040;
+                border-radius:6px;
+                padding:8px 12px;
+                cursor:pointer;
+                margin-right:10px;
+                font-family:'IBM Plex Mono', monospace;
+            }}
+            button:hover {{
+                background:#222;
+                box-shadow:0 0 10px #ffda0030;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>🖥 Console – Preset Area Editor</h1>
+        <p>You can edit the coordinates of <b>North Departures</b> and <b>South Departures</b> here. Make sure your JSON format is valid.</p>
+        <textarea id="jsonInput">{json_text}</textarea>
+        <div class="btns">
+            <button onclick="saveChanges()">💾 Save Changes</button>
+            <button onclick="resetDefaults()">♻ Reset to Defaults</button>
+            <button onclick="window.location='/'">⬅ Back</button>
+        </div>
+        <script>
+            async function saveChanges() {{
+                try {{
+                    const data = JSON.parse(document.getElementById('jsonInput').value);
+                    const res = await fetch('/update-presets', {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        body: JSON.stringify(data)
+                    }});
+                    if(res.ok) alert('✅ Preset areas updated successfully!');
+                    else alert('⚠️ Failed to update presets.');
+                }} catch (e) {{
+                    alert('❌ Invalid JSON format!');
+                }}
+            }}
+
+            async function resetDefaults() {{
+                if(!confirm('Are you sure you want to reset to default coordinates?')) return;
+                const res = await fetch('/reset-presets', {{method:'POST'}});
+                if(res.ok) {{
+                    alert('✅ Presets reset to default.');
+                    location.reload();
+                }} else alert('⚠️ Failed to reset presets.');
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
 
 # === AREA API ===
 @app.post("/save-area")
@@ -149,6 +250,35 @@ async def set_active(name: str):
             save_json(ACTIVE_AREA_FILE, a)
             return {"status": "active", "name": name}
     return JSONResponse({"error": "Area not found"}, status_code=404)
+
+@app.post("/update-presets")
+async def update_presets(request: Request):
+    """Update North and South departure areas manually."""
+    data = await request.json()
+    if not isinstance(data, list):
+        return JSONResponse({"error": "Invalid format"}, status_code=400)
+
+    areas = load_areas()
+    updated_names = [a["name"] for a in data]
+
+    # Replace matching presets or add new ones
+    new_list = [a for a in areas if a["name"] not in updated_names]
+    new_list.extend(data)
+    save_json(AREAS_FILE, new_list)
+    return {"status": "updated", "count": len(data)}
+
+
+@app.post("/reset-presets")
+async def reset_presets():
+    """Restore North and South areas to their defaults."""
+    areas = load_areas()
+    existing_names = [a["name"] for a in areas]
+
+    # remove current presets if they exist
+    areas = [a for a in areas if a["name"] not in ["North Departures", "South Departures"]]
+    areas.extend(DEFAULT_AREAS)
+    save_json(AREAS_FILE, areas)
+    return {"status": "reset", "defaults": [a["name"] for a in DEFAULT_AREAS]}
 
 
 # === FLIGHT INFO ===

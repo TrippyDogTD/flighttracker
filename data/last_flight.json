@@ -1,7 +1,7 @@
 {
-  "flight": "No traffic in area",
-  "destination": "--",
-  "aircraft": "--",
-  "altitude": "--",
-  "logo": "/static/logos/default.png"
+  "flight": "ARE4200",
+  "destination": "MTR",
+  "aircraft": "A320",
+  "altitude": "10075 ft",
+  "logo": "/static/logos/LA.png"
 }
