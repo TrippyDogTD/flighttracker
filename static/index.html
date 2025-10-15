@@ -1,49 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>✈ Live Flight Board ✈</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Flight Board ✈</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <div class="wrapper">
-    <header class="title">
-      <span class="plane-btn" onclick="goToMap()">✈</span>
+  <div class="container">
+    <header class="header">
+      <span class="plane" onclick="goToMap()">✈</span>
       <h1>LIVE FLIGHT BOARD</h1>
-      <span class="plane-btn" onclick="goToMap()">✈</span>
+      <span class="plane" onclick="goToMap()">✈</span>
     </header>
 
-    <main class="board">
-      <div class="info-section">
-        <div class="info-box">
-          <span class="label">Flight:</span>
-          <span id="flight" class="value">--</span>
-        </div>
-        <div class="info-box">
-          <span class="label">Destination:</span>
-          <span id="destination" class="value">--</span>
-        </div>
-        <div class="info-box">
-          <span class="label">Aircraft:</span>
-          <span id="aircraft" class="value">--</span>
-        </div>
-        <div class="info-box">
-          <span class="label">Altitude:</span>
-          <span id="altitude" class="value">--</span>
-        </div>
+    <div class="board">
+      <div class="info">
+        <div class="row"><span class="label">Flight:</span><span id="flight">--</span></div>
+        <div class="row"><span class="label">Destination:</span><span id="destination">--</span></div>
+        <div class="row"><span class="label">Aircraft:</span><span id="aircraft">--</span></div>
+        <div class="row"><span class="label">Altitude:</span><span id="altitude">--</span></div>
       </div>
 
       <div class="divider"></div>
 
-      <div class="clock-section">
-        <img id="logo" src="/static/logos/default.png" alt="Logo" />
-        <div class="clock-container">
-          <span class="clock-label">UTC</span>
-          <div id="clock" class="flip-clock"></div>
-        </div>
+      <div class="right-panel">
+        <img id="logo" src="/static/logos/default.png" alt="Logo">
+        <p class="utc-label">UTC</p>
+        <div id="clock" class="flip-clock"></div>
       </div>
-    </main>
+    </div>
 
     <footer>
       Designed by <span class="brand">TrippyDog ✈</span>
@@ -51,39 +37,26 @@
   </div>
 
   <script>
-    // Navigate to map
     function goToMap() {
       window.location.href = "/map";
     }
 
-    // Update clock (split-flap animation style)
+    // Flip clock logic
     function updateClock() {
       const clock = document.getElementById("clock");
       const now = new Date();
-      const utc = now.toUTCString().split(" ")[4]; // HH:MM:SS
-      const digits = utc.split("");
-
-      const spans = clock.querySelectorAll(".digit");
-      digits.forEach((char, i) => {
-        if (!spans[i]) {
-          const d = document.createElement("div");
-          d.className = "digit";
-          d.textContent = char;
-          clock.appendChild(d);
-        } else if (spans[i].textContent !== char) {
-          spans[i].classList.add("flip");
-          setTimeout(() => {
-            spans[i].textContent = char;
-            spans[i].classList.remove("flip");
-          }, 250);
-        }
+      const time = now.toUTCString().split(" ")[4];
+      const chars = time.split("");
+      clock.innerHTML = "";
+      chars.forEach(c => {
+        const digit = document.createElement("div");
+        digit.className = "digit";
+        if (c === ":") digit.classList.add("colon");
+        digit.textContent = c;
+        clock.appendChild(digit);
       });
     }
 
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // Fetch flight info
     async function updateFlight() {
       try {
         const res = await fetch("/flight");
@@ -93,13 +66,15 @@
         document.getElementById("aircraft").textContent = data.aircraft || "--";
         document.getElementById("altitude").textContent = data.altitude || "--";
         document.getElementById("logo").src = data.logo || "/static/logos/default.png";
-      } catch (e) {
-        console.error("Error fetching flight:", e);
+      } catch (err) {
+        console.error("Flight fetch error:", err);
       }
     }
 
     updateFlight();
     setInterval(updateFlight, 15000);
+    updateClock();
+    setInterval(updateClock, 1000);
   </script>
 </body>
 </html>
