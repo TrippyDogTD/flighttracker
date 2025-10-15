@@ -1,22 +1,48 @@
-# Python
+# === Python & FastAPI ===
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-
-# Virtual environment
-.venv/
-env/
-venv/
-
-# IDE
-.vscode/
-.idea/
-
-# Logs / temp files
+*.db
+*.sqlite3
 *.log
-*.tmp
 
-# Render cache
-.pytest_cache/
-.cache/
+# === Virtual environments ===
+.venv/
+venv/
+env/
+ENV/
+Pipfile
+Pipfile.lock
+
+# === System files ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# === Build / cache ===
+*.egg-info/
+dist/
+build/
+
+# === Render / Deployment ===
+.render/
+*.pid
+*.sock
+
+# === Project-specific ===
+# Keep presets but ignore runtime data
+data/active_area.json
+data/last_flight.json
+
+# (Optional) Uncomment below if you want to ignore *all* dynamic areas
+# data/areas.json
+
+# === Static cache ===
+static/__pycache__/
+static/logs/
+static/tmp/
+

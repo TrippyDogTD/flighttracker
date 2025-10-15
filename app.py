@@ -16,7 +16,6 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 fr = FlightRadar24API()
 
-
 # === HELPERS ===
 def load_json(path, fallback=None):
     if os.path.exists(path):
@@ -38,8 +37,7 @@ def load_areas():
 def get_active_area():
     return load_json(ACTIVE_AREA_FILE, None)
 
-
-# === Ensure default areas exist ===
+# === DEFAULT AREAS (factory presets) ===
 DEFAULT_AREAS = [
     {
         "name": "North Departures",
@@ -81,9 +79,8 @@ def ensure_default_areas():
     if not os.path.exists(AREAS_FILE):
         save_json(AREAS_FILE, DEFAULT_AREAS)
 
-# call once on startup
+# Create defaults if missing
 ensure_default_areas()
-
 
 # === PAGES ===
 @app.get("/", response_class=HTMLResponse)
@@ -97,10 +94,14 @@ async def map_editor():
     with open("static/map.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
+
 @app.get("/console", response_class=HTMLResponse)
 async def console_page():
+    """Visual console to edit North & South presets."""
     areas = load_areas()
     presets = [a for a in areas if a["name"] in ["North Departures", "South Departures"]]
+    if not presets:
+        presets = DEFAULT_AREAS
     json_data = json.dumps(presets, indent=2)
 
     return f"""
@@ -154,18 +155,10 @@ async def console_page():
     <body>
         <div class="toolbar">
             <h3>🖥 Preset Area Console</h3>
+            <p>Edit both <b>North</b> and <b>South</b> departure areas directly on the map.</p>
             <div>
-                <label>Preset:</label>
-                <select id="presetSelect">
-                    <option value="">-- Select Preset --</option>
-                    <option value="North Departures">North Departures</option>
-                    <option value="South Departures">South Departures</option>
-                </select>
-            </div>
-            <div>
-                <button onclick="loadPreset()">📍 Load</button>
-                <button onclick="savePreset()">💾 Save Changes</button>
-                <button onclick="resetPreset()">♻ Reset Defaults</button>
+                <button onclick="saveAll()">💾 Save All</button>
+                <button onclick="resetDefaults()">♻ Reset Defaults</button>
                 <button onclick="window.location='/'">⬅ Back</button>
             </div>
         </div>
@@ -173,55 +166,71 @@ async def console_page():
         <div id="map"></div>
 
         <script>
+            let presets = {json_data};
             let map = L.map('map').setView([4.7, -74.1], 11);
             L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
             const drawnItems = new L.FeatureGroup().addTo(map);
+
+            // Draw Control
             const drawControl = new L.Control.Draw({{
                 edit: {{ featureGroup: drawnItems }},
                 draw: {{ polygon: true, rectangle: false, circle: false, marker: false, polyline: false }}
             }});
             map.addControl(drawControl);
 
-            let currentLayer = null;
-            let currentPreset = null;
-            let presets = {json_data};
+            let layers = {{}};
 
-            function loadPreset() {{
-                const name = document.getElementById('presetSelect').value;
-                if (!name) return alert("Select a preset first.");
-                const area = presets.find(p => p.name === name);
-                if (!area) return alert("Preset not found.");
-
-                if (currentLayer) drawnItems.removeLayer(currentLayer);
-                currentPreset = name;
-                currentLayer = L.polygon(area.points.map(p => [p.lat, p.lng]), {{color:'cyan'}}).addTo(drawnItems);
-                map.fitBounds(currentLayer.getBounds());
+            // --- Auto load both presets ---
+            function loadAllPresets() {{
+                presets.forEach(p => {{
+                    const color = p.name === "North Departures" ? "cyan" : "orange";
+                    const layer = L.polygon(
+                        p.points.map(pt => [pt.lat, pt.lng]),
+                        {{ color, weight: 3, fillOpacity: 0.2 }}
+                    ).addTo(drawnItems);
+                    layers[p.name] = layer;
+                }});
+                const bounds = L.featureGroup(Object.values(layers)).getBounds();
+                map.fitBounds(bounds);
             }}
+            loadAllPresets();
 
+            // --- Handle new drawings ---
             map.on(L.Draw.Event.CREATED, e => {{
-                if (currentLayer) drawnItems.removeLayer(currentLayer);
-                currentLayer = e.layer;
-                drawnItems.addLayer(currentLayer);
+                const name = prompt("Replace which preset? Type 'North Departures' or 'South Departures'");
+                if (!name || !['North Departures','South Departures'].includes(name)) {{
+                    alert("Invalid name. Please type exactly 'North Departures' or 'South Departures'.");
+                    return;
+                }}
+                if (layers[name]) drawnItems.removeLayer(layers[name]);
+                layers[name] = e.layer;
+                drawnItems.addLayer(e.layer);
+                const color = name === "North Departures" ? "cyan" : "orange";
+                e.layer.setStyle({{color, weight: 3, fillOpacity: 0.2}});
+                alert(`✏️ Updated polygon for ${{name}}. Click 'Save All' to store it.`);
             }});
 
-            async function savePreset() {{
-                if (!currentLayer || !currentPreset)
-                    return alert("Load or draw a preset area first.");
-                const coords = currentLayer.getLatLngs()[0].map(p => ({{lat:p.lat, lng:p.lng}}));
-                const res = await fetch('/update-presets', {{
+            // --- Save all presets ---
+            async function saveAll() {{
+                const updated = Object.entries(layers).map(([name, layer]) => {{
+                    const coords = layer.getLatLngs()[0].map(p => ({{lat:p.lat, lng:p.lng}}));
+                    return {{ name, points: coords }};
+                }});
+                const res = await fetch('/update-all-presets', {{
                     method:'POST',
                     headers:{{'Content-Type':'application/json'}},
-                    body:JSON.stringify([{{name: currentPreset, points: coords}}])
+                    body: JSON.stringify(updated)
                 }});
-                if (res.ok) alert("✅ Preset updated!");
-                else alert("⚠️ Failed to update preset.");
+                if(res.ok) alert("✅ Preset areas saved (overwrote defaults).");
+                else alert("⚠️ Failed to save presets.");
             }}
 
-            async function resetPreset() {{
-                if (!confirm("Reset both presets to default?")) return;
+            // --- Reset presets to defaults ---
+            async function resetDefaults() {{
+                if(!confirm("Reset both areas to default coordinates?")) return;
                 const res = await fetch('/reset-presets', {{method:'POST'}});
-                if (res.ok) {{
-                    alert("✅ Presets reset!");
+                if(res.ok) {{
+                    alert("✅ Presets reset to defaults.");
                     location.reload();
                 }} else alert("⚠️ Failed to reset.");
             }}
@@ -255,11 +264,9 @@ async def save_area(request: Request):
 
 @app.get("/get-area")
 async def get_area(name: str):
-    # special query for dropdown list
     if name == "__list__":
         areas = load_areas()
         return {"areas": [a["name"] for a in areas]}
-
     areas = load_areas()
     for a in areas:
         if a["name"] == name:
@@ -282,35 +289,47 @@ async def set_active(name: str):
             return {"status": "active", "name": name}
     return JSONResponse({"error": "Area not found"}, status_code=404)
 
-@app.post("/update-presets")
-async def update_presets(request: Request):
-    """Update North and South departure areas manually."""
+
+@app.post("/update-all-presets")
+async def update_all_presets(request: Request):
+    """Completely overwrite all default preset areas (North + South)."""
     data = await request.json()
     if not isinstance(data, list):
-        return JSONResponse({"error": "Invalid format"}, status_code=400)
+        return JSONResponse({"error": "Invalid data"}, status_code=400)
 
     areas = load_areas()
-    updated_names = [a["name"] for a in data]
+    areas = [a for a in areas if a["name"] not in ["North Departures", "South Departures"]]
 
-    # Replace matching presets or add new ones
-    new_list = [a for a in areas if a["name"] not in updated_names]
-    new_list.extend(data)
-    save_json(AREAS_FILE, new_list)
-    return {"status": "updated", "count": len(data)}
+    for p in data:
+        points = p.get("points", [])
+        if not points:
+            continue
+        latitudes = [pt["lat"] for pt in points]
+        longitudes = [pt["lng"] for pt in points]
+        bounds = {
+            "tl_y": max(latitudes),
+            "tl_x": min(longitudes),
+            "br_y": min(latitudes),
+            "br_x": max(longitudes),
+        }
+        areas.append({
+            "name": p["name"],
+            "points": points,
+            "bounds": bounds
+        })
+
+    save_json(AREAS_FILE, areas)
+    return {"status": "overwritten", "count": len(data)}
 
 
 @app.post("/reset-presets")
 async def reset_presets():
-    """Restore North and South areas to their defaults."""
+    """Restore North and South areas to defaults."""
     areas = load_areas()
-    existing_names = [a["name"] for a in areas]
-
-    # remove current presets if they exist
     areas = [a for a in areas if a["name"] not in ["North Departures", "South Departures"]]
     areas.extend(DEFAULT_AREAS)
     save_json(AREAS_FILE, areas)
     return {"status": "reset", "defaults": [a["name"] for a in DEFAULT_AREAS]}
-
 
 # === FLIGHT INFO ===
 @app.get("/flight")

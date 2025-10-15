@@ -3,6 +3,32 @@ services:
     name: flighttracker
     env: python
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn app:app --host 0.0.0.0 --port 10000"
+    region: oregon
+
+    # Environment
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: PORT
+        value: 10000
+
+    # Build process
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    # Start command (uses Render's dynamic port)
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+
+    # File persistence
     autoDeploy: true
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+
+    # Optional health check (you can remove it if you prefer)
+    healthCheckPath: /
+
+    # (Optional) Specify a branch to deploy from
+    # branch: main
