@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Live Flight Board ✈</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="flightboard-container">
+    <h1 class="title">
+      <span class="plane">✈</span>
+      LIVE FLIGHT BOARD
+      <span class="plane">✈</span>
+    </h1>
+
+    <div class="flightboard">
+      <!-- Left side info -->
+      <div class="left-panel">
+        <div class="info-row"><span class="label">Flight:</span><span id="flight" class="value">--</span></div>
+        <div class="info-row"><span class="label">Destination:</span><span id="destination" class="value">--</span></div>
+        <div class="info-row"><span class="label">Aircraft:</span><span id="aircraft" class="value">--</span></div>
+        <div class="info-row"><span class="label">Altitude:</span><span id="altitude" class="value">--</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Right side logo + clock -->
+      <div class="right-panel">
+        <img id="logo" src="/static/logos/default.png" alt="Logo" />
+        <div class="clock-section">
+          <div class="clock-label">UTC</div>
+          <div id="clock" class="clock"></div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span class="link" onclick="window.location='/map'">🗺 Edit Areas</span>
+      <span class="divider-dot">•</span>
+      Designed by <span class="highlight">TrippyDog ✈</span>
+    </footer>
+  </div>
+
+  <script>
+    // CLOCK
+    const clock = document.getElementById("clock");
+    const makeDigit = v => {
+      const d = document.createElement("div");
+      d.className = "digit";
+      d.textContent = v;
+      d.dataset.value = v;
+      clock.appendChild(d);
+      return d;
+    };
+    const makeColon = () => {
+      const c = document.createElement("div");
+      c.className = "colon";
+      c.textContent = ":";
+      clock.appendChild(c);
+    };
+    for (let i = 0; i < 2; i++) makeDigit("0");
+    makeColon();
+    for (let i = 0; i < 2; i++) makeDigit("0");
+    makeColon();
+    for (let i = 0; i < 2; i++) makeDigit("0");
+
+    const digits = [...clock.querySelectorAll(".digit")];
+    function updateClock() {
+      const now = new Date();
+      const t = now.toISOString().slice(11, 19).replaceAll(":", "");
+      t.split("").forEach((n, i) => {
+        const el = digits[i];
+        if (el.dataset.value !== n) {
+          el.dataset.value = n;
+          el.textContent = n;
+          el.classList.remove("flip");
+          void el.offsetWidth;
+          el.classList.add("flip");
+        }
+      });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // FLIGHT DATA
+    async function updateFlight() {
+      try {
+        const res = await fetch("/flight");
+        const d = await res.json();
+        const ids = ["flight","destination","aircraft","altitude"];
+        ids.forEach(id=>{
+          const el=document.getElementById(id);
+          el.textContent=d[id]||"--";
+          el.classList.add("breathe");
+          setTimeout(()=>el.classList.remove("breathe"),500);
+        });
+        document.getElementById("logo").src = d.logo || "/static/logos/default.png";
+      } catch {
+        document.getElementById("flight").textContent = "Error fetching";
+      }
+    }
+    updateFlight();
+    setInterval(updateFlight, 7000);
+  </script>
+</body>
+</html>

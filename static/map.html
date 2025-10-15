@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Edit Tracking Areas ✈</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <style>
+    body { margin: 0; background: #000; color: #ffd84b; font-family: "IBM Plex Mono", monospace; }
+    #map { height: 100vh; width: 100vw; }
+
+    .toolbar {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid #ffda0040;
+      border-radius: 10px;
+      padding: 10px 15px;
+      color: #ffd84b;
+      font-family: "IBM Plex Mono", monospace;
+      box-shadow: 0 0 20px #ffda0040;
+    }
+
+    select, button {
+      font-family: inherit;
+      font-size: 0.9rem;
+      background: #111;
+      color: #ffd84b;
+      border: 1px solid #ffda0040;
+      border-radius: 6px;
+      padding: 5px 10px;
+      margin: 5px 3px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #222; box-shadow: 0 0 10px #ffda0030; }
+    h1 { font-size: 1rem; margin: 0 0 5px 0; text-shadow: 0 0 10px #ffec7a; }
+
+    /* move Leaflet controls down by ~10 cm (~180px visually) */
+    .leaflet-top.leaflet-left {
+      top: 180px !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>✈ Area Manager</h1>
+    <div>
+      <label>Saved Areas:</label>
+      <select id="areaSelect">
+        <option value="">-- Loading... --</option>
+      </select>
+    </div>
+    <div>
+      <button id="loadArea">📍 Load</button>
+      <button id="saveArea">💾 Save New</button>
+      <button id="useArea">✈ Use</button>
+      <button onclick="window.location='/'">⬅ Back</button>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const map = L.map("map").setView([4.7, -74.1], 11);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    const drawnItems = new L.FeatureGroup().addTo(map);
+    const drawControl = new L.Control.Draw({
+      edit: { featureGroup: drawnItems },
+      draw: { polygon: true, rectangle: false, circle: false, marker: false, polyline: false }
+    });
+    map.addControl(drawControl);
+
+    let currentLayer = null;
+    let savedAreas = [];
+
+    async function loadSavedAreas() {
+      try {
+        const res = await fetch("/get-area?name=__list__");
+        const data = await res.json();
+        savedAreas = data.areas || [];
+      } catch { savedAreas = []; }
+
+      const sel = document.getElementById("areaSelect");
+      sel.innerHTML = "";
+      const optDefault = document.createElement("option");
+      optDefault.textContent = "-- Select Area --";
+      optDefault.value = "";
+      sel.appendChild(optDefault);
+      savedAreas.forEach(a => {
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = a;
+        sel.appendChild(opt);
+      });
+    }
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+      if (currentLayer) drawnItems.removeLayer(currentLayer);
+      currentLayer = e.layer;
+      drawnItems.addLayer(currentLayer);
+    });
+
+    document.getElementById("saveArea").onclick = async () => {
+      if (!currentLayer) return alert("❌ Draw an area first!");
+      const name = prompt("Enter a name for this area:");
+      if (!name) return;
+      const latlngs = currentLayer.getLatLngs()[0].map(p => ({ lat: p.lat, lng: p.lng }));
+      const body = { name, points: latlngs };
+      const res = await fetch("/save-area", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        alert("✅ Area saved!");
+        await loadSavedAreas();
+      } else alert("⚠️ Failed to save area.");
+    };
+
+    document.getElementById("loadArea").onclick = async () => {
+      const name = document.getElementById("areaSelect").value;
+      if (!name) return alert("Select an area to load.");
+      const res = await fetch(`/get-area?name=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      if (data.error) return alert("Area not found!");
+      if (currentLayer) drawnItems.removeLayer(currentLayer);
+      currentLayer = L.polygon(data.points, { color: "cyan" }).addTo(drawnItems);
+      map.fitBounds(currentLayer.getBounds());
+    };
+
+    document.getElementById("useArea").onclick = async () => {
+      const name = document.getElementById("areaSelect").value;
+      if (!name) return alert("Select an area first.");
+      const res = await fetch(`/set-active?name=${encodeURIComponent(name)}`, { method: "POST" });
+      if (res.ok) alert("✅ Area set as active!");
+      else alert("⚠️ Could not set active area.");
+    };
+
+    loadSavedAreas();
+  </script>
+</body>
+</html>
