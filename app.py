@@ -39,6 +39,52 @@ def get_active_area():
     return load_json(ACTIVE_AREA_FILE, None)
 
 
+# === Ensure default areas exist ===
+DEFAULT_AREAS = [
+    {
+        "name": "North Departures",
+        "points": [
+            {"lat": 4.694676974798616, "lng": -74.12439993004844},
+            {"lat": 4.684072186061007, "lng": -74.10293646446759},
+            {"lat": 4.760867724535295, "lng": -74.07288761265441},
+            {"lat": 4.747527462828149, "lng": -74.01845626394139},
+            {"lat": 4.655677928685259, "lng": -74.04884853120387},
+            {"lat": 4.6880062393764375, "lng": -74.12972286951248}
+        ],
+        "bounds": {
+            "tl_y": 4.760867724535295,
+            "tl_x": -74.12972286951248,
+            "br_y": 4.655677928685259,
+            "br_x": -74.01845626394139
+        },
+    },
+    {
+        "name": "South Departures",
+        "points": [
+            {"lat": 4.597002505156178, "lng": -74.17444229221913},
+            {"lat": 4.614684654851182, "lng": -74.1436588881145},
+            {"lat": 4.668007332161394, "lng": -74.12899867331046},
+            {"lat": 4.678969204741258, "lng": -74.09736634514647},
+            {"lat": 4.657532329351648, "lng": -74.06102128289232},
+            {"lat": 4.594382876125526, "lng": -74.08084841356483}
+        ],
+        "bounds": {
+            "tl_y": 4.678969204741258,
+            "tl_x": -74.17444229221913,
+            "br_y": 4.594382876125526,
+            "br_x": -74.06102128289232
+        },
+    }
+]
+
+def ensure_default_areas():
+    if not os.path.exists(AREAS_FILE):
+        save_json(AREAS_FILE, DEFAULT_AREAS)
+
+# call once on startup
+ensure_default_areas()
+
+
 # === PAGES ===
 @app.get("/", response_class=HTMLResponse)
 async def home():
