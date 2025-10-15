@@ -99,60 +99,51 @@ async def map_editor():
 
 @app.get("/console", response_class=HTMLResponse)
 async def console_page():
-    # Load all saved areas
     areas = load_areas()
-    # Filter only North & South departures
-    preset_areas = [a for a in areas if a["name"] in ["North Departures", "South Departures"]]
-
-    # If none exist, load defaults
-    if not preset_areas:
-        preset_areas = DEFAULT_AREAS
-
-    # Build editable JSON string
-    json_text = json.dumps(preset_areas, indent=2)
+    presets = [a for a in areas if a["name"] in ["North Departures", "South Departures"]]
+    json_data = json.dumps(presets, indent=2)
 
     return f"""
     <html>
     <head>
-        <title>Console | FlightTracker</title>
-        <link rel="stylesheet" href="/static/styles.css" />
+        <title>Preset Console ✈</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
         <style>
             body {{
+                margin:0;
                 background:#000;
                 color:#ffd84b;
-                font-family:'IBM Plex Mono', monospace;
-                padding:20px;
+                font-family:"IBM Plex Mono", monospace;
             }}
-            h1 {{
-                font-size:1.4rem;
-                margin-bottom:10px;
-                text-shadow:0 0 10px #ffda00;
+            #map {{
+                height: 90vh;
+                width: 100vw;
             }}
-            textarea {{
-                width:100%;
-                height:70vh;
-                background:#111;
-                color:#ffd84b;
+            .toolbar {{
+                position:absolute;
+                top:15px;
+                left:15px;
+                z-index:1000;
+                background:rgba(0,0,0,0.85);
                 border:1px solid #ffda0040;
-                border-radius:8px;
-                padding:10px;
-                font-family:'IBM Plex Mono', monospace;
+                border-radius:10px;
+                padding:10px 15px;
+                color:#ffd84b;
+                box-shadow:0 0 20px #ffda0040;
+            }}
+            select,button {{
+                font-family:inherit;
                 font-size:0.9rem;
-                resize:none;
-                box-shadow:inset 0 0 10px #000;
-            }}
-            .btns {{
-                margin-top:15px;
-            }}
-            button {{
                 background:#111;
                 color:#ffd84b;
                 border:1px solid #ffda0040;
                 border-radius:6px;
-                padding:8px 12px;
+                padding:5px 10px;
+                margin:5px 3px;
                 cursor:pointer;
-                margin-right:10px;
-                font-family:'IBM Plex Mono', monospace;
             }}
             button:hover {{
                 background:#222;
@@ -161,43 +152,83 @@ async def console_page():
         </style>
     </head>
     <body>
-        <h1>🖥 Console – Preset Area Editor</h1>
-        <p>You can edit the coordinates of <b>North Departures</b> and <b>South Departures</b> here. Make sure your JSON format is valid.</p>
-        <textarea id="jsonInput">{json_text}</textarea>
-        <div class="btns">
-            <button onclick="saveChanges()">💾 Save Changes</button>
-            <button onclick="resetDefaults()">♻ Reset to Defaults</button>
-            <button onclick="window.location='/'">⬅ Back</button>
+        <div class="toolbar">
+            <h3>🖥 Preset Area Console</h3>
+            <div>
+                <label>Preset:</label>
+                <select id="presetSelect">
+                    <option value="">-- Select Preset --</option>
+                    <option value="North Departures">North Departures</option>
+                    <option value="South Departures">South Departures</option>
+                </select>
+            </div>
+            <div>
+                <button onclick="loadPreset()">📍 Load</button>
+                <button onclick="savePreset()">💾 Save Changes</button>
+                <button onclick="resetPreset()">♻ Reset Defaults</button>
+                <button onclick="window.location='/'">⬅ Back</button>
+            </div>
         </div>
+
+        <div id="map"></div>
+
         <script>
-            async function saveChanges() {{
-                try {{
-                    const data = JSON.parse(document.getElementById('jsonInput').value);
-                    const res = await fetch('/update-presets', {{
-                        method: 'POST',
-                        headers: {{'Content-Type': 'application/json'}},
-                        body: JSON.stringify(data)
-                    }});
-                    if(res.ok) alert('✅ Preset areas updated successfully!');
-                    else alert('⚠️ Failed to update presets.');
-                }} catch (e) {{
-                    alert('❌ Invalid JSON format!');
-                }}
+            let map = L.map('map').setView([4.7, -74.1], 11);
+            L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+            const drawnItems = new L.FeatureGroup().addTo(map);
+            const drawControl = new L.Control.Draw({{
+                edit: {{ featureGroup: drawnItems }},
+                draw: {{ polygon: true, rectangle: false, circle: false, marker: false, polyline: false }}
+            }});
+            map.addControl(drawControl);
+
+            let currentLayer = null;
+            let currentPreset = null;
+            let presets = {json_data};
+
+            function loadPreset() {{
+                const name = document.getElementById('presetSelect').value;
+                if (!name) return alert("Select a preset first.");
+                const area = presets.find(p => p.name === name);
+                if (!area) return alert("Preset not found.");
+
+                if (currentLayer) drawnItems.removeLayer(currentLayer);
+                currentPreset = name;
+                currentLayer = L.polygon(area.points.map(p => [p.lat, p.lng]), {{color:'cyan'}}).addTo(drawnItems);
+                map.fitBounds(currentLayer.getBounds());
             }}
 
-            async function resetDefaults() {{
-                if(!confirm('Are you sure you want to reset to default coordinates?')) return;
+            map.on(L.Draw.Event.CREATED, e => {{
+                if (currentLayer) drawnItems.removeLayer(currentLayer);
+                currentLayer = e.layer;
+                drawnItems.addLayer(currentLayer);
+            }});
+
+            async function savePreset() {{
+                if (!currentLayer || !currentPreset)
+                    return alert("Load or draw a preset area first.");
+                const coords = currentLayer.getLatLngs()[0].map(p => ({{lat:p.lat, lng:p.lng}}));
+                const res = await fetch('/update-presets', {{
+                    method:'POST',
+                    headers:{{'Content-Type':'application/json'}},
+                    body:JSON.stringify([{{name: currentPreset, points: coords}}])
+                }});
+                if (res.ok) alert("✅ Preset updated!");
+                else alert("⚠️ Failed to update preset.");
+            }}
+
+            async function resetPreset() {{
+                if (!confirm("Reset both presets to default?")) return;
                 const res = await fetch('/reset-presets', {{method:'POST'}});
-                if(res.ok) {{
-                    alert('✅ Presets reset to default.');
+                if (res.ok) {{
+                    alert("✅ Presets reset!");
                     location.reload();
-                }} else alert('⚠️ Failed to reset presets.');
+                }} else alert("⚠️ Failed to reset.");
             }}
         </script>
     </body>
     </html>
     """
-
 
 # === AREA API ===
 @app.post("/save-area")

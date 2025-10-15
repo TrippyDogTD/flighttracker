@@ -1,7 +1,7 @@
 {
-  "flight": "ARE4200",
-  "destination": "MTR",
-  "aircraft": "A320",
-  "altitude": "10075 ft",
-  "logo": "/static/logos/LA.png"
+  "flight": "AAL916",
+  "destination": "MIA",
+  "aircraft": "B38M",
+  "altitude": "9675 ft",
+  "logo": "/static/logos/AA.png"
 }
