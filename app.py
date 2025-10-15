@@ -10,37 +10,58 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 fr = FlightRadar24API()
 AREAS_FILE = "areas.json"
-ACTIVE_AREA_FILE = "active_area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
 
-# -------- Helpers --------
+# -------- Default Areas --------
+DEFAULT_AREAS = [
+    {
+        "name": "North Departures",
+        "points": [
+            {"lat": 4.85, "lng": -74.15},
+            {"lat": 4.90, "lng": -74.05},
+            {"lat": 4.75, "lng": -74.00},
+            {"lat": 4.70, "lng": -74.10},
+        ],
+    },
+    {
+        "name": "South Departures",
+        "points": [
+            {"lat": 4.65, "lng": -74.20},
+            {"lat": 4.55, "lng": -74.15},
+            {"lat": 4.55, "lng": -74.05},
+            {"lat": 4.65, "lng": -74.00},
+        ],
+    },
+]
+
+
+def ensure_default_areas():
+    """Ensure default areas exist globally."""
+    if not os.path.exists(AREAS_FILE):
+        with open(AREAS_FILE, "w") as f:
+            json.dump(DEFAULT_AREAS, f, indent=2)
+
+
+ensure_default_areas()
+
+
 def load_areas():
-    if os.path.exists(AREAS_FILE):
-        with open(AREAS_FILE, "r") as f:
-            return json.load(f)
-    return []
+    with open(AREAS_FILE, "r") as f:
+        return json.load(f)
 
 
-def get_active_area():
-    if os.path.exists(ACTIVE_AREA_FILE):
-        with open(ACTIVE_AREA_FILE, "r") as f:
-            return json.load(f)
-    return None
-
-
-# -------- Pages --------
+# -------- Home Page --------
 @app.get("/", response_class=HTMLResponse)
 async def home():
     with open("static/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 
+# -------- Map Editor --------
 @app.get("/map", response_class=HTMLResponse)
 async def map_editor():
-    saved_areas = load_areas()
-    active = get_active_area()
-    active_name = active["name"] if active else ""
+    default_areas = load_areas()
 
     return f"""
     <html>
@@ -53,12 +74,9 @@ async def map_editor():
     </head>
     <body style="margin:0">
         <div style="position:absolute;top:10px;left:10px;z-index:1000;background:#000a;padding:10px;border-radius:8px;color:white;font-family:sans-serif">
-            <label for="areaSelect">Saved Areas:</label>
-            <select id="areaSelect" onchange="loadSelectedArea()" style="margin-left:6px;">
-                <option value="">-- Select Area --</option>
-                {''.join(f'<option value="{a["name"]}" {"selected" if a["name"]==active_name else ""}>{a["name"]}</option>' for a in saved_areas)}
-            </select>
-            <button onclick="saveNewArea()" style="margin-left:10px;">💾 Save New</button>
+            <label>Active Area:</label>
+            <select id="areaSelect" onchange="loadSelectedArea()" style="margin-left:6px;"></select>
+            <button onclick="saveNewArea()" style="margin-left:10px;">💾 Save</button>
             <button onclick="setActive()" style="margin-left:5px;">✈ Use</button>
             <button onclick="deleteArea()" style="margin-left:5px;color:red;">🗑 Delete</button>
         </div>
@@ -66,12 +84,32 @@ async def map_editor():
         <script>
             const map = L.map('map').setView([4.7, -74.1], 11);
             L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
+
             let currentPolygon = null;
             const drawControl = new L.Control.Draw({{
                 draw: {{ polygon:true, polyline:false, circle:false, rectangle:false, marker:false }},
                 edit: {{ featureGroup: new L.FeatureGroup() }}
             }});
             map.addControl(drawControl);
+
+            const defaultAreas = {json.dumps(DEFAULT_AREAS)};
+            let localAreas = JSON.parse(localStorage.getItem("localAreas") || "[]");
+            let allAreas = [...defaultAreas, ...localAreas];
+            let activeArea = localStorage.getItem("activeArea");
+
+            function populateList() {{
+                const sel = document.getElementById("areaSelect");
+                sel.innerHTML = "";
+                allAreas.forEach(a => {{
+                    const opt = document.createElement("option");
+                    opt.value = a.name;
+                    opt.textContent = a.name;
+                    if (a.name === activeArea) opt.selected = true;
+                    sel.appendChild(opt);
+                }});
+            }}
+
+            populateList();
 
             map.on(L.Draw.Event.CREATED, e => {{
                 if (currentPolygon) map.removeLayer(currentPolygon);
@@ -80,129 +118,75 @@ async def map_editor():
             }});
 
             async function saveNewArea() {{
-                if (!currentPolygon) {{
-                    alert("❌ Draw an area first!");
-                    return;
-                }}
+                if (!currentPolygon) return alert("❌ Draw an area first!");
                 const name = prompt("Enter a name for this area:");
                 if (!name) return;
                 const coords = currentPolygon.getLatLngs()[0].map(p => ({{lat:p.lat, lng:p.lng}}));
-                const resp = await fetch('/save-area', {{
-                    method:'POST',
-                    headers:{{'Content-Type':'application/json'}},
-                    body:JSON.stringify({{name, points:coords}})
-                }});
-                if (resp.ok) {{
-                    alert("✅ Area saved!");
-                    location.reload();
-                }} else alert("⚠️ Failed to save area.");
+                localAreas = localAreas.filter(a => a.name !== name);
+                localAreas.push({{name, points:coords}});
+                localStorage.setItem("localAreas", JSON.stringify(localAreas));
+                allAreas = [...defaultAreas, ...localAreas];
+                populateList();
+                alert("✅ Saved locally!");
             }}
 
-            async function loadSelectedArea() {{
+            function loadSelectedArea() {{
                 const name = document.getElementById("areaSelect").value;
-                if (!name) return;
-                const res = await fetch(`/get-area?name=${{encodeURIComponent(name)}}`);
-                const data = await res.json();
+                const a = allAreas.find(x => x.name === name);
+                if (!a) return;
                 if (currentPolygon) map.removeLayer(currentPolygon);
-                currentPolygon = L.polygon(data.points, {{color:'cyan'}}).addTo(map);
+                currentPolygon = L.polygon(a.points, {{color:'cyan'}}).addTo(map);
                 map.fitBounds(currentPolygon.getBounds());
             }}
 
-            async function setActive() {{
-                const name = document.getElementById("areaSelect").value;
-                if (!name) return alert("Select an area first.");
-                const res = await fetch(`/set-active?name=${{encodeURIComponent(name)}}`, {{ method:'POST' }});
-                if (res.ok) {{
-                    alert("✅ Active area set!");
-                }} else alert("⚠️ Could not set area.");
+            function setActive() {{
+                activeArea = document.getElementById("areaSelect").value;
+                localStorage.setItem("activeArea", activeArea);
+                alert("✅ Active area set!");
             }}
 
-            async function deleteArea() {{
+            function deleteArea() {{
                 const name = document.getElementById("areaSelect").value;
                 if (!name) return alert("Select an area first.");
-                if (!confirm(`Delete area '${{name}}'?`)) return;
-                const res = await fetch(`/delete-area?name=${{encodeURIComponent(name)}}`, {{ method:'DELETE' }});
-                if (res.ok) {{
-                    alert("🗑 Area deleted!");
-                    location.reload();
-                }} else alert("⚠️ Could not delete area.");
+                if (defaultAreas.find(a => a.name === name)) {{
+                    alert("❌ Cannot delete default areas.");
+                    return;
+                }}
+                if (!confirm(`Delete '${{name}}'?`)) return;
+                localAreas = localAreas.filter(a => a.name !== name);
+                localStorage.setItem("localAreas", JSON.stringify(localAreas));
+                allAreas = [...defaultAreas, ...localAreas];
+                populateList();
+                alert("🗑 Deleted locally.");
             }}
 
-            if ("{active_name}") {{
-                loadSelectedArea();
-            }}
+            if (activeArea) loadSelectedArea();
         </script>
     </body>
     </html>
     """
 
 
-# -------- Area API --------
-@app.post("/save-area")
-async def save_area(request: Request):
-    data = await request.json()
-    name = data.get("name")
-    points = data.get("points")
-    if not name or not points:
-        return {"error": "Name or points missing"}
-
-    areas = load_areas()
-    areas = [a for a in areas if a["name"] != name]
-    latitudes = [p["lat"] for p in points]
-    longitudes = [p["lng"] for p in points]
-    bounds = {
-        "tl_y": max(latitudes),
-        "tl_x": min(longitudes),
-        "br_y": min(latitudes),
-        "br_x": max(longitudes),
-    }
-    areas.append({"name": name, "points": points, "bounds": bounds})
-
-    with open(AREAS_FILE, "w") as f:
-        json.dump(areas, f, indent=2)
-    return {"status": "saved", "name": name}
-
-
-@app.get("/get-area")
-async def get_area(name: str):
-    areas = load_areas()
-    for a in areas:
-        if a["name"] == name:
-            return a
-    return {"error": "Area not found"}
-
-
-@app.delete("/delete-area")
-async def delete_area(name: str):
-    areas = [a for a in load_areas() if a["name"] != name]
-    with open(AREAS_FILE, "w") as f:
-        json.dump(areas, f, indent=2)
-    return {"status": "deleted", "name": name}
-
-
-@app.post("/set-active")
-async def set_active(name: str):
-    areas = load_areas()
-    for a in areas:
-        if a["name"] == name:
-            with open(ACTIVE_AREA_FILE, "w") as f:
-                json.dump(a, f, indent=2)
-            return {"status": "active", "name": name}
-    return {"error": "Area not found"}
-
-
 # -------- Flight Info --------
 @app.get("/flight")
 async def get_flight():
     try:
-        active = get_active_area()
-        if not active:
-            raise Exception("No active area selected")
+        # get area points from last saved global active or fallback
+        if not os.path.exists(AREAS_FILE):
+            ensure_default_areas()
 
+        with open(AREAS_FILE, "r") as f:
+            default_areas = json.load(f)
+
+        # fallback default to north departures
+        active = default_areas[0]
         polygon = Polygon([(p["lng"], p["lat"]) for p in active["points"]])
-        b = active["bounds"]
-        bounds_str = f"{b['tl_y']},{b['tl_x']},{b['br_y']},{b['br_x']}"
+
+        b_lats = [p["lat"] for p in active["points"]]
+        b_lngs = [p["lng"] for p in active["points"]]
+        bounds_str = f"{max(b_lats)},{min(b_lngs)},{min(b_lats)},{max(b_lngs)}"
         flights = fr.get_flights(bounds=bounds_str)
+
         valid = []
         for f in flights:
             try:
@@ -212,13 +196,13 @@ async def get_flight():
                 continue
 
         if not valid:
-            data = {
+            data = {{
                 "flight": "No traffic in area",
                 "destination": "--",
                 "aircraft": "--",
                 "altitude": "--",
                 "logo": "/static/logos/SS.png" if os.path.exists("static/logos/SS.png") else "/static/logos/default.png",
-            }
+            }}
             with open(LAST_FLIGHT_FILE, "w") as f:
                 json.dump(data, f)
             return data
@@ -228,13 +212,13 @@ async def get_flight():
         logo_path = f"static/logos/{airline_code}.png"
         logo_url = f"/static/logos/{airline_code}.png" if os.path.exists(logo_path) else "/static/logos/default.png"
 
-        data = {
+        data = {{
             "flight": (chosen.callsign or chosen.id or "--"),
             "destination": (chosen.destination_airport_iata or "--"),
             "aircraft": (chosen.aircraft_code or "--"),
-            "altitude": f"{int(chosen.altitude)} ft" if chosen.altitude else "--",
+            "altitude": f"{{int(chosen.altitude)}} ft" if chosen.altitude else "--",
             "logo": logo_url,
-        }
+        }}
         with open(LAST_FLIGHT_FILE, "w") as f:
             json.dump(data, f)
         return data
@@ -244,4 +228,4 @@ async def get_flight():
         if os.path.exists(LAST_FLIGHT_FILE):
             with open(LAST_FLIGHT_FILE, "r") as f:
                 return json.load(f)
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={{"error": str(e)}}, status_code=500)
