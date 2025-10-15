@@ -211,7 +211,7 @@ async def get_flight():
                 if (
                     f.longitude and f.latitude
                     and polygon.contains(Point(f.longitude, f.latitude))
-                    and (f.altitude or 0) >= 1000
+                    and (f.altitude or 0) >= 500
                     and f.heading is not None
                     and (f.heading >= 340 or f.heading <= 90)
                 ):
