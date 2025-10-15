@@ -22,7 +22,6 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* airplanes same style as text, not glowing */
 .plane {
   font-size: 1.3em;
   color: inherit;
@@ -33,6 +32,7 @@ body {
 /* --- Main board --- */
 .flightboard-container {
   text-align: center;
+  padding: 1rem;
 }
 
 .flightboard {
@@ -44,8 +44,9 @@ body {
   border-radius: 1rem;
   padding: 2rem 3rem;
   gap: 3rem;
-  min-width: 820px;
+  min-width: 780px;
   border: 1px solid #d6c25b22;
+  transition: all 0.3s ease;
 }
 
 /* --- Left Panel --- */
@@ -217,4 +218,50 @@ footer {
 .divider-dot {
   margin: 0 0.5rem;
   color: #777;
+}
+
+/* --- Responsive for iPad / Mobile --- */
+@media (max-width: 900px) {
+  body {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    padding: 1rem 0;
+  }
+
+  .flightboard {
+    flex-direction: column;
+    min-width: auto;
+    width: 90%;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .divider {
+    width: 80%;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #d6c25b, transparent);
+  }
+
+  .left-panel {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .info-row {
+    width: 100%;
+  }
+
+  .right-panel {
+    width: 100%;
+  }
+
+  #logo {
+    width: 120px;
+    height: 120px;
+  }
+
+  .clock {
+    gap: 0.15rem;
+  }
 }
