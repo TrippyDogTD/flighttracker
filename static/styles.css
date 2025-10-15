@@ -92,11 +92,12 @@ body {
   width: 110px;
   height: 110px;
   object-fit: contain;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 235, 120, 0.1); /* 🌟 light yellow tint */
   border-radius: 0.5rem;
   margin-bottom: 0.6rem;
   box-shadow: 0 0 10px #0007;
 }
+
 
 .clock-label {
   font-size: 0.9rem;

@@ -13,28 +13,28 @@ AREAS_FILE = "areas.json"
 ACTIVE_AREA_FILE = "active_area.json"
 LAST_FLIGHT_FILE = "last_flight.json"
 
-# Helper: Load saved areas
+
+# -------- Helpers --------
 def load_areas():
     if os.path.exists(AREAS_FILE):
         with open(AREAS_FILE, "r") as f:
             return json.load(f)
     return []
 
-# Helper: Get active area
+
 def get_active_area():
     if os.path.exists(ACTIVE_AREA_FILE):
         with open(ACTIVE_AREA_FILE, "r") as f:
             return json.load(f)
     return None
 
-# ----------------------------
-# FRONTEND PAGES
-# ----------------------------
 
+# -------- Pages --------
 @app.get("/", response_class=HTMLResponse)
 async def home():
     with open("static/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
+
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_editor():
@@ -128,7 +128,6 @@ async def map_editor():
                 }} else alert("⚠️ Could not delete area.");
             }}
 
-            // Auto load current active area
             if ("{active_name}") {{
                 loadSelectedArea();
             }}
@@ -137,10 +136,8 @@ async def map_editor():
     </html>
     """
 
-# ----------------------------
-# API ROUTES FOR AREAS
-# ----------------------------
 
+# -------- Area API --------
 @app.post("/save-area")
 async def save_area(request: Request):
     data = await request.json()
@@ -165,6 +162,7 @@ async def save_area(request: Request):
         json.dump(areas, f, indent=2)
     return {"status": "saved", "name": name}
 
+
 @app.get("/get-area")
 async def get_area(name: str):
     areas = load_areas()
@@ -173,12 +171,14 @@ async def get_area(name: str):
             return a
     return {"error": "Area not found"}
 
+
 @app.delete("/delete-area")
 async def delete_area(name: str):
     areas = [a for a in load_areas() if a["name"] != name]
     with open(AREAS_FILE, "w") as f:
         json.dump(areas, f, indent=2)
     return {"status": "deleted", "name": name}
+
 
 @app.post("/set-active")
 async def set_active(name: str):
@@ -190,10 +190,8 @@ async def set_active(name: str):
             return {"status": "active", "name": name}
     return {"error": "Area not found"}
 
-# ----------------------------
-# FLIGHT FETCH
-# ----------------------------
 
+# -------- Flight Info --------
 @app.get("/flight")
 async def get_flight():
     try:
@@ -208,20 +206,14 @@ async def get_flight():
         valid = []
         for f in flights:
             try:
-                if (
-                    f.longitude and f.latitude
-                    and polygon.contains(Point(f.longitude, f.latitude))
-                    and (f.altitude or 0) >= 500
-                    and f.heading is not None
-                    and (f.heading >= 340 or f.heading <= 90)
-                ):
+                if f.longitude and f.latitude and polygon.contains(Point(f.longitude, f.latitude)):
                     valid.append(f)
             except Exception:
                 continue
 
         if not valid:
             data = {
-                "flight": "No traffic northbound",
+                "flight": "No traffic in area",
                 "destination": "--",
                 "aircraft": "--",
                 "altitude": "--",
