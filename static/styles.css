@@ -1,10 +1,128 @@
-#logo {
-  width: 130px;
-  height: 130px;
-  object-fit: contain;
-  background: rgba(255, 240, 160, 0.2); /* a warmer yellow glow */
+/* Global look */
+body {
+  background: radial-gradient(circle at top, #111, #000);
+  color: #ffeb99;
+  font-family: "Courier New", monospace;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  text-align: center;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: #ffee80;
+  text-shadow: 0 0 8px #ffb;
+  margin-bottom: 1rem;
+}
+
+/* Board Layout */
+.board {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #111;
   border-radius: 1rem;
-  padding: 8px;
-  margin-bottom: 0.6rem;
-  box-shadow: 0 0 15px #0007;
+  box-shadow: 0 0 40px #ffdb4d20, inset 0 0 10px #000;
+  padding: 2rem 3rem;
+  gap: 2rem;
+  min-width: 750px;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  background: #222;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  box-shadow: inset 0 0 5px #000;
+}
+
+.label {
+  color: #ffe55e;
+  font-weight: bold;
+  margin-right: 1rem;
+}
+
+.divider {
+  height: 200px;
+  width: 2px;
+  background: linear-gradient(to bottom, #ffdb4d44, #ffdb4d);
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#logo {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  background: rgba(255, 240, 180, 0.25);
+  border-radius: 1.2rem;
+  padding: 10px;
+  margin-bottom: 1rem;
+  box-shadow: 0 0 20px #0009;
+}
+
+/* Clock section */
+.clock-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.utc-label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #ffd;
+  letter-spacing: 0.1em;
+}
+
+.clock {
+  display: flex;
+  gap: 0.15em;
+  margin-top: 0.5rem;
+}
+
+.flip-digit {
+  background: #111;
+  color: #ffeb99;
+  border-radius: 4px;
+  padding: 0.3rem 0.25rem;
+  box-shadow: 0 0 8px #ffb93380;
+  font-size: 1.3rem;
+  min-width: 0.8rem;
+  text-align: center;
+}
+
+/* Footer */
+footer {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: #ccc;
+  text-shadow: 0 0 4px #222;
+}
+
+.brand {
+  color: #ffdb4d;
+  font-weight: bold;
+  text-shadow: 0 0 8px #ffb;
 }
