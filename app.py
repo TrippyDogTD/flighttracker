@@ -23,16 +23,13 @@ def load_json(path, fallback=None):
             return json.load(f)
     return fallback
 
-
 def save_json(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
-
 def load_areas():
     return load_json(AREAS_FILE, [])
-
 
 def get_active_area():
     return load_json(ACTIVE_AREA_FILE, None)
@@ -42,36 +39,55 @@ DEFAULT_AREAS = [
     {
         "name": "North Departures",
         "points": [
-            {"lat": 4.694676974798616, "lng": -74.12439993004844},
-            {"lat": 4.684072186061007, "lng": -74.10293646446759},
+            {"lat": 4.698246838071399, "lng": -74.12175106688908},
+            {"lat": 4.694911547607643, "lng": -74.11612970137926},
+            {"lat": 4.697570780586943, "lng": -74.10845178272764},
+            {"lat": 4.703728613626548, "lng": -74.10244305518812},
             {"lat": 4.760867724535295, "lng": -74.07288761265441},
-            {"lat": 4.747527462828149, "lng": -74.01845626394139},
-            {"lat": 4.655677928685259, "lng": -74.04884853120387},
-            {"lat": 4.6880062393764375, "lng": -74.12972286951248}
+            {"lat": 4.7526492160982725, "lng": -74.03738531675218},
+            {"lat": 4.680460697340953, "lng": -74.0533483880303},
+            {"lat": 4.66592128717711, "lng": -74.06107305729782},
+            {"lat": 4.661976457635476, "lng": -74.07703390388664},
+            {"lat": 4.664029931023765, "lng": -74.09541082489014},
+            {"lat": 4.6885170763773205, "lng": -74.12956233737546}
         ],
         "bounds": {
             "tl_y": 4.760867724535295,
-            "tl_x": -74.12972286951248,
-            "br_y": 4.655677928685259,
-            "br_x": -74.01845626394139
-        },
+            "tl_x": -74.12956233737546,
+            "br_y": 4.661976457635476,
+            "br_x": -74.03738531675218
+        }
     },
     {
         "name": "South Departures",
         "points": [
-            {"lat": 4.597002505156178, "lng": -74.17444229221913},
-            {"lat": 4.614684654851182, "lng": -74.1436588881145},
-            {"lat": 4.668007332161394, "lng": -74.12899867331046},
-            {"lat": 4.678969204741258, "lng": -74.09736634514647},
-            {"lat": 4.657532329351648, "lng": -74.06102128289232},
-            {"lat": 4.594382876125526, "lng": -74.08084841356483}
+            {"lat": 4.573004651351026, "lng": -74.16183425331995},
+            {"lat": 4.565139088143042, "lng": -74.21437385080947},
+            {"lat": 4.571292664710016, "lng": -74.2263791164451},
+            {"lat": 4.587035350886071, "lng": -74.24011740293382},
+            {"lat": 4.608934618624681, "lng": -74.23805338781334},
+            {"lat": 4.622794719149873, "lng": -74.2287828391994},
+            {"lat": 4.644867406569783, "lng": -74.18981848749263},
+            {"lat": 4.652054430005734, "lng": -74.17591539908562},
+            {"lat": 4.656929245606564, "lng": -74.15350958031775},
+            {"lat": 4.66257526354396, "lng": -74.13943362549375},
+            {"lat": 4.673353619895683, "lng": -74.1334237856096},
+            {"lat": 4.678912206591428, "lng": -74.13720353389341},
+            {"lat": 4.686057582102098, "lng": -74.14677095590538},
+            {"lat": 4.695125289446733, "lng": -74.13896078038327},
+            {"lat": 4.664113890105243, "lng": -74.0954110566286},
+            {"lat": 4.651706013880786, "lng": -74.07874375089291},
+            {"lat": 4.636993698111343, "lng": -74.0797762219301},
+            {"lat": 4.619201673543216, "lng": -74.08664439187288},
+            {"lat": 4.605514406400415, "lng": -74.0976327592964},
+            {"lat": 4.597299839128363, "lng": -74.11291989138394}
         ],
         "bounds": {
-            "tl_y": 4.678969204741258,
-            "tl_x": -74.17444229221913,
-            "br_y": 4.594382876125526,
-            "br_x": -74.06102128289232
-        },
+            "tl_y": 4.695125289446733,
+            "tl_x": -74.24011740293382,
+            "br_y": 4.565139088143042,
+            "br_x": -74.07874375089291
+        }
     }
 ]
 
@@ -88,12 +104,10 @@ async def home():
     with open("static/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
-
 @app.get("/map", response_class=HTMLResponse)
 async def map_editor():
     with open("static/map.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
-
 
 @app.get("/console", response_class=HTMLResponse)
 async def console_page():
@@ -171,7 +185,6 @@ async def console_page():
             L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png').addTo(map);
             const drawnItems = new L.FeatureGroup().addTo(map);
 
-            // Draw Control
             const drawControl = new L.Control.Draw({{
                 edit: {{ featureGroup: drawnItems }},
                 draw: {{ polygon: true, rectangle: false, circle: false, marker: false, polyline: false }}
@@ -180,7 +193,6 @@ async def console_page():
 
             let layers = {{}};
 
-            // --- Auto load both presets ---
             function loadAllPresets() {{
                 presets.forEach(p => {{
                     const color = p.name === "North Departures" ? "cyan" : "orange";
@@ -195,7 +207,6 @@ async def console_page():
             }}
             loadAllPresets();
 
-            // --- Handle new drawings ---
             map.on(L.Draw.Event.CREATED, e => {{
                 const name = prompt("Replace which preset? Type 'North Departures' or 'South Departures'");
                 if (!name || !['North Departures','South Departures'].includes(name)) {{
@@ -210,7 +221,6 @@ async def console_page():
                 alert(`✏️ Updated polygon for ${{name}}. Click 'Save All' to store it.`);
             }});
 
-            // --- Save all presets ---
             async function saveAll() {{
                 const updated = Object.entries(layers).map(([name, layer]) => {{
                     const coords = layer.getLatLngs()[0].map(p => ({{lat:p.lat, lng:p.lng}}));
@@ -225,7 +235,6 @@ async def console_page():
                 else alert("⚠️ Failed to save presets.");
             }}
 
-            // --- Reset presets to defaults ---
             async function resetDefaults() {{
                 if(!confirm("Reset both areas to default coordinates?")) return;
                 const res = await fetch('/reset-presets', {{method:'POST'}});
@@ -261,7 +270,6 @@ async def save_area(request: Request):
     save_json(AREAS_FILE, areas)
     return {"status": "saved", "name": name}
 
-
 @app.get("/get-area")
 async def get_area(name: str):
     if name == "__list__":
@@ -273,13 +281,11 @@ async def get_area(name: str):
             return a
     return JSONResponse({"error": "Area not found"}, status_code=404)
 
-
 @app.delete("/delete-area")
 async def delete_area(name: str):
     new_areas = [a for a in load_areas() if a["name"] != name]
     save_json(AREAS_FILE, new_areas)
     return {"status": "deleted", "name": name}
-
 
 @app.post("/set-active")
 async def set_active(name: str):
@@ -288,7 +294,6 @@ async def set_active(name: str):
             save_json(ACTIVE_AREA_FILE, a)
             return {"status": "active", "name": name}
     return JSONResponse({"error": "Area not found"}, status_code=404)
-
 
 @app.post("/update-all-presets")
 async def update_all_presets(request: Request):
@@ -320,7 +325,6 @@ async def update_all_presets(request: Request):
 
     save_json(AREAS_FILE, areas)
     return {"status": "overwritten", "count": len(data)}
-
 
 @app.post("/reset-presets")
 async def reset_presets():
