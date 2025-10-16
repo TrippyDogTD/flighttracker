@@ -44,9 +44,7 @@
     h1 { font-size: 1rem; margin: 0 0 5px 0; text-shadow: 0 0 10px #ffec7a; }
 
     /* move Leaflet controls down by ~10 cm (~180px visually) */
-    .leaflet-top.leaflet-left {
-      top: 180px !important;
-    }
+    .leaflet-top.leaflet-left { top: 180px !important; }
   </style>
 </head>
 <body>
@@ -59,7 +57,6 @@
       </select>
     </div>
     <div>
-      <button id="loadArea">📍 Load</button>
       <button id="saveArea">💾 Save New</button>
       <button id="useArea">✈ Use</button>
       <button onclick="window.location='/'">⬅ Back</button>
@@ -79,6 +76,7 @@
     map.addControl(drawControl);
 
     let currentLayer = null;
+    let activeLayer = null;
     let savedAreas = [];
 
     async function loadSavedAreas() {
@@ -102,6 +100,28 @@
       });
     }
 
+    async function loadAreaByName(name, color = "cyan") {
+      if (!name) return;
+      try {
+        const res = await fetch(`/get-area?name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+        if (data.error) return alert("Area not found!");
+        if (currentLayer && color === "cyan") drawnItems.removeLayer(currentLayer);
+        const layer = L.polygon(data.points, { color, weight: 3, fillOpacity: 0.2 }).addTo(drawnItems);
+        map.fitBounds(layer.getBounds());
+        if (color === "cyan") currentLayer = layer;
+        else if (color === "lime") activeLayer = layer;
+      } catch (err) {
+        console.error("Error loading area:", err);
+      }
+    }
+
+    // 🔁 Auto-load when selecting from dropdown
+    document.getElementById("areaSelect").addEventListener("change", (e) => {
+      const name = e.target.value;
+      if (name) loadAreaByName(name);
+    });
+
     map.on(L.Draw.Event.CREATED, function (e) {
       if (currentLayer) drawnItems.removeLayer(currentLayer);
       currentLayer = e.layer;
@@ -122,29 +142,39 @@
       if (res.ok) {
         alert("✅ Area saved!");
         await loadSavedAreas();
+        document.getElementById("areaSelect").value = name;
+        loadAreaByName(name);
       } else alert("⚠️ Failed to save area.");
     };
 
-    document.getElementById("loadArea").onclick = async () => {
-      const name = document.getElementById("areaSelect").value;
-      if (!name) return alert("Select an area to load.");
-      const res = await fetch(`/get-area?name=${encodeURIComponent(name)}`);
-      const data = await res.json();
-      if (data.error) return alert("Area not found!");
-      if (currentLayer) drawnItems.removeLayer(currentLayer);
-      currentLayer = L.polygon(data.points, { color: "cyan" }).addTo(drawnItems);
-      map.fitBounds(currentLayer.getBounds());
-    };
-
+    // ✈ Use button — set active + return to board
     document.getElementById("useArea").onclick = async () => {
       const name = document.getElementById("areaSelect").value;
       if (!name) return alert("Select an area first.");
       const res = await fetch(`/set-active?name=${encodeURIComponent(name)}`, { method: "POST" });
-      if (res.ok) alert("✅ Area set as active!");
-      else alert("⚠️ Could not set active area.");
+      if (res.ok) {
+        alert(`✅ '${name}' set as active.`);
+        window.location = "/";  // go back to flight board
+      } else alert("⚠️ Could not set active area.");
     };
 
-    loadSavedAreas();
+    // 🟢 Highlight current active area on startup
+    async function showActiveArea() {
+      try {
+        const res = await fetch("/data/active_area.json");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.name || !data.points) return;
+        await loadAreaByName(data.name, "lime");
+      } catch (e) {
+        console.warn("No active area loaded:", e);
+      }
+    }
+
+    (async () => {
+      await loadSavedAreas();
+      await showActiveArea();
+    })();
   </script>
 </body>
 </html>
